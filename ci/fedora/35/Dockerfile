@@ -10,7 +10,7 @@ WORKDIR /opt
 # RUN dnf -y install dependencies/*\.rpm
 
 # Build tools
-RUN dnf -y install git make autoconf automake libtool rpm-build
+RUN dnf -y install git make python3-devel python3-setuptools autoconf automake libtool rpm-build
 
 RUN git clone https://github.com/adjacentlink/emane-node-director -b develop
 

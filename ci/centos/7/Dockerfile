@@ -11,7 +11,7 @@ WORKDIR /opt
 # RUN yum -y install dependencies/*\.rpm
 
 # Build tools
-RUN yum -y install git make autoconf automake libtool rpm-build
+RUN yum -y install git make python-setuptools autoconf automake libtool rpm-build
 
 RUN git clone https://github.com/adjacentlink/emane-node-director -b develop
 WORKDIR emane-node-director

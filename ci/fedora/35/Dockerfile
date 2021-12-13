@@ -6,8 +6,9 @@ RUN dnf -y update
 
 # Copy and install packages from the latest upsteam dependencies
 WORKDIR /opt
-# RUN mkdir -p dependencies
-# RUN dnf -y install dependencies/*\.rpm
+RUN mkdir -p dependencies
+COPY --from=gcr.io/automated-builds-303920/fedora35.emane /opt/built/* dependencies/
+RUN dnf -y install dependencies/*\.rpm
 
 # Build tools
 RUN dnf -y install git make python3-devel python3-setuptools autoconf automake libtool rpm-build

@@ -36,9 +36,14 @@ EMANE Node Director
 Summary: %{summary}
 %{?python_provide:%python_provide python2-%{base_name}}
 %if %{with_old_depends}
-Provides: emane-node-director
+BuildRequires: python-devel
+Requires: python-emane
+Requires: python-pandas
 %define use_python2_sitelib %{python_sitelib}
 %else
+BuildRequires: python2-devel
+Requires: python2-emane
+Requires: python2-pandas
 %define use_python2_sitelib %{python2_sitelib}
 %endif
 %description -n python2-%{base_name} %{_description}
@@ -46,6 +51,9 @@ Provides: emane-node-director
 %package -n python3-%{base_name}
 Summary: %{summary}
 %{?python_provide:%python_provide python3-%{base_name}}
+BuildRequires: python3-devel
+Requires: python3-emane
+Requires: python3-pandas
 %description -n python3-%{base_name} %{_description}
 %endif
 

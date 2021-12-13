@@ -7,11 +7,12 @@ RUN yum -y update
 
 # Copy and install packages from the latest upsteam dependencies
 WORKDIR /opt
-# RUN mkdir -p dependencies
-# RUN yum -y install dependencies/*\.rpm
+RUN mkdir -p dependencies
+COPY --from=gcr.io/automated-builds-303920/centos7.emane /opt/built/* dependencies/
+RUN yum -y install dependencies/*\.rpm
 
 # Build tools
-RUN yum -y install git make python-setuptools autoconf automake libtool rpm-build
+RUN yum -y install git make python-develop python-setuptools autoconf automake libtool rpm-build
 
 RUN git clone https://github.com/adjacentlink/emane-node-director -b develop
 WORKDIR emane-node-director

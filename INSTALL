@@ -1,0 +1,15 @@
+./autogen.sh
+
+./configure
+
+# RPM YUM
+make rpm
+sudo yum install dist/emane-node-director*rpm
+
+# RPM DNF
+make rpm
+sudo yum install dist/emane-node-director*rpm
+
+# DEB
+make deb
+sudo dpkg -i deb_dist/emane-node-director*deb

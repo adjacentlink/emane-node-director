@@ -1,0 +1,24 @@
+Makefile.in
+aclocal.m4
+autom4te.cache/
+compile
+config.guess
+config.sub
+configure
+install-sh
+ltmain.sh
+m4/
+missing
+
+Makefile
+config.log
+config.status
+libtool
+
+build/
+setup.py
+On branch develop
+
+emane-node-director*.tar.gz
+.rpmbuild
+.debbuild

@@ -144,6 +144,18 @@ class PositionOrientationVelocity(object):
         self.adjustedOrientation_ = adjustOrientation(self.orientation_, self.velocity_)
 
 
+    def set_position(self, lat, lon, alt):
+        """
+        Helper function for building POV when only position
+        is known
+        """
+        position = Position()
+        position.set(lat, lon, alt)
+        self.set(position,
+                 (Orientation(), False),
+                 (Velocity(), False))
+
+
     def update(self,
                position,
                orientation_pair,

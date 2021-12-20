@@ -30,10 +30,11 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-
+from __future__ import absolute_import, division, print_function
 import os
+
+from pandas import DataFrame
 from emane_node_director.positionorientationvelocity import calculateDirection
-import pandas as pd
 
 
 class AntennaPointer(object):
@@ -124,8 +125,8 @@ class AntennaPointer(object):
 
             if not eventtime == last_eventtime:
                 if last_eventtime is not None:
-                    state_df = pd.DataFrame(list(rows.values()),
-                                            columns=['nem','ant_num','az','el','tracking'])
+                    state_df = DataFrame(list(rows.values()),
+                                         columns=['nem','ant_num','az','el','tracking'])
                     try:
                         # this seems necessary for python3
                         state_df = state_df.astype({'ant_num':int,'tracking':int})
@@ -143,8 +144,8 @@ class AntennaPointer(object):
 
             rows[nem] = (nem,ant_num,az,el,0)
 
-        state_df = pd.DataFrame(list(rows.values()),
-                                columns=['nem','ant_num','az','el','tracking'])
+        state_df = DataFrame(list(rows.values()),
+                             columns=['nem','ant_num','az','el','tracking'])
         try:
             # this seems necessary for python3
             state_df = state_df.astype({'ant_num':int,'tracking':int})

@@ -31,9 +31,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
+from __future__ import absolute_import, division, print_function
 from collections import defaultdict
 import os
-import pandas as pd
+from pandas import DataFrame
 
 
 class NodeTracker(object):
@@ -101,8 +102,8 @@ class NodeTracker(object):
 
             if not eventtime == last_eventtime:
                 if last_eventtime is not None:
-                    state_df = pd.DataFrame(list(rows.values()),
-                                            columns=['nem','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
+                    state_df = DataFrame(list(rows.values()),
+                                         columns=['nem','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
                     state_df.set_index('nem', inplace=True)
                     state_df.sort_index(inplace=True)
                     states.append(state_df)
@@ -133,8 +134,8 @@ class NodeTracker(object):
                 row[8] = roll
                 row[9] = yaw
 
-        state_df = pd.DataFrame(list(rows.values()),
-                                columns=['nem','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
+        state_df = DataFrame(list(rows.values()),
+                             columns=['nem','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
         state_df.set_index('nem', inplace=True)
         state_df.sort_index(inplace=True)
         states.append(state_df)

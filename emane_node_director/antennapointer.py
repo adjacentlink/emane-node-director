@@ -57,6 +57,8 @@ class AntennaPointer(object):
     def add_observer(self, observer):
         self._observers.update([observer])
 
+        observer.update()
+
 
     def update(self):
         current_pos = self._tracker.current

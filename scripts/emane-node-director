@@ -90,9 +90,9 @@ Move emane NEM locations.'''
                         metavar='TIMESTEP',
                         type=float,
                         default=5.0,
-                        help='''When writing current state to an
-                        EELFILE, advance time by TIMESTEP for each
-                        write. Default: 5.0.''')
+                        help='''When writing the current state to the EEL
+                        format STATEFILE, advance time by TIMESTEP for
+                        each write. Default: 5.0.''')
     parser.add_argument('--statefile',
                         metavar='STATEFILE',
                         default='state.eel',
@@ -133,7 +133,7 @@ Move emane NEM locations.'''
                         metavar='FREQUENCY',
                         type=int,
                         default=2347000000,
-                        help='''Specifies the frequency at which
+                        help='''Specifies the frequency (Hz) at which
                         pathloss values are computed when the
                         frequency argument is set to freespace.''')
 

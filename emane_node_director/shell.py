@@ -86,16 +86,19 @@ class Shell(cmd.Cmd):
             'd':self.move_down
         }
 
-        self._orientation_handler = {
-            'u':self.orient_up,
-            'd':self.orient_down,
-            'cw':self.orient_clockwise,
-            'cc':self.orient_counter_clockwise,
+        self._azimuth_handler = {
+            'cw':self.azimuth_clockwise,
+            'cc':self.azimuth_counter_clockwise
+        }
+
+        self._elevation_handler = {
+            'u':self.elevation_up,
+            'd':self.elevation_down
         }
 
         self._pitch_handler = {
-            'cw':self.pitch_clockwise,
-            'cc':self.pitch_counter_clockwise,
+            'u':self.pitch_up,
+            'd':self.pitch_down,
         }
 
         self._roll_handler = {
@@ -155,17 +158,21 @@ class Shell(cmd.Cmd):
             self.do_show()
 
 
-    def help_exit(self):
-        print('exit')
-
     def do_exit(self, arg):
+        """
+        Close and exit.
+
+        exit
+        """
         return True
 
 
-    def help_reset(self):
-        print('reset [NEMIds]')
-
     def do_reset(self, arg):
+        """
+        Reset all NEMs to their initial state.
+
+        reset
+        """
         # TODO, handle restting just individual nem args
         self._tracker.reset()
 
@@ -174,10 +181,12 @@ class Shell(cmd.Cmd):
         self._send()
 
 
-    def help_show(self):
-        print('show [NEMIds]')
-
     def do_show(self, arg=None):
+        """
+        Show the current state of one or more NEMs.
+
+        show [NEMIds]
+        """
         current_pos = self._tracker.current
         current_dir = self._pointer.current
         current_pathloss = self._pathloss_calc.current
@@ -188,20 +197,32 @@ class Shell(cmd.Cmd):
             print(current_pos.loc[self._tracker.nemstr_to_nemlist(nemstr)])
             print()
             print(current_dir.loc[self._pointer.nemstr_to_nemlist(nemstr)])
+            print()
+            print(current_pathloss.loc[self._pointer.nemstr_to_nemlist(nemstr)])
+            print()
         else:
             print(current_pos)
             print()
-            print(current_dir)
+            if current_dir.empty:
+                print('No antenna pointing data')
+            else:
+                print(current_dir)
             print()
-            print(current_pathloss)
+            if current_pathloss.empty:
+                print('No pathloss data')
+            else:
+                print(current_pathloss)
         print()
 
 
 
-    def help_move(self):
-        print('move NEMIds n|s|e|w|u|d [steps]')
-
     def do_move(self, arg):
+        """
+        Move one or more NEMs [n]orth, [s]outh, [e]ast, [w]est
+        [u]p or [d]own by 1 or more steps.
+
+        move NEMIds n|s|e|w|u|d [steps]
+        """
         toks = arg.split()
 
         nemlist = []
@@ -258,10 +279,12 @@ class Shell(cmd.Cmd):
         self._tracker.move_alt(nemlist, step)
 
 
-    def help_moveto(self):
-        print('moveto srcNEMId dstNEMId')
-
     def do_moveto(self, arg):
+        """
+        Move one NEM (src) to the position of another NEM (dst).
+
+        moveto srcNEMId dstNEMId
+        """
         if len(arg) < 2:
             self.help_moveto()
             return
@@ -296,10 +319,12 @@ class Shell(cmd.Cmd):
         self._send()
 
 
-    def help_movewith(self):
-        print('movewith slaveNEMIds masterNEMId')
-
     def do_movewith(self, arg):
+        """
+        Set one or more NEMs (followers) to move with another NEM (leader).
+
+        movewith followerNEMIds leaderNEMId
+        """
         if len(arg) < 2:
             self.help_movewith()
             return
@@ -333,35 +358,76 @@ class Shell(cmd.Cmd):
         self._tracker.movewith(srcnems, dstnem)
 
 
-    def help_orient(self):
-        print('orient NEMId u|d|cw|cc steps')
+    def do_azimuth(self, arg):
+        """
+        Adjust the azimuth component of one or more NEMs velocity
+        vector [cw] clockwise or [cc] counterclockwise by one or more
+        steps.
 
-
-    def do_orient(self, arg):
+        azimuth NEMIds cw|cc [steps]
+        """
         toks = arg.split()
 
         try:
             nemlist = self._tracker.nemstr_to_nemlist(toks[0])
         except:
-            self.help_orient()
+            self.help_azimuth()
             return
 
         if not nemlist:
             print('No matching nems found for %s.' % toks[0])
             return
 
-        orientation = toks[1].lower()
+        azimuth = toks[1].lower()
+
+        if not azimuth in self._azimuth_handler:
+            print('Unrecognized azimuth "%s".' % toks[1])
+            return
 
         steps = 1 if len(toks) < 3 else int(toks[2])
 
-        self._orientation_handler[orientation](nemlist, steps)
+        self._azimuth_handler[azimuth](nemlist, steps)
         self._send()
 
 
-    def help_point(self):
-        print('point NEMId u|d|cw|cc steps')
+    def do_elevation(self, arg):
+        """
+        Adjust the elevation component of one or more NEMs velocity vector [u]p
+        or [d]own by one or more steps.
+
+        elevation NEMIds u|d [steps]
+        """
+        toks = arg.split()
+
+        try:
+            nemlist = self._tracker.nemstr_to_nemlist(toks[0])
+        except:
+            self.help_elevation()
+            return
+
+        if not nemlist:
+            print('No matching nems found for %s.' % toks[0])
+            return
+
+        elevation = toks[1].lower()
+
+        if not elevation in self._elevation_handler:
+            print('Unrecognized elevation "%s".' % toks[1])
+            return
+
+        steps = 1 if len(toks) < 3 else int(toks[2])
+
+        self._elevation_handler[elevation](nemlist, steps)
+        self._send()
+
 
     def do_point(self, arg):
+        """
+        Adjust antenna pointing of one or more nems [u]p, [d]own, [cw] clockwise
+        or [cc] counter clockwise by one or more steps.
+
+        point NEMIds u|d|cw|cc [steps]
+        """
         toks = arg.split()
 
         try:
@@ -371,7 +437,7 @@ class Shell(cmd.Cmd):
             return
 
         if not nemlist:
-            print('No matching nems found for %s.' % toks[0])
+            print('No antenna information found for nem %s.' % toks[0])
             return
 
         pointing = toks[1].lower()
@@ -386,28 +452,28 @@ class Shell(cmd.Cmd):
         self._send()
 
 
-    def orient_up(self, nemlist, steps):
+    def elevation_up(self, nemlist, steps):
         step = self._anglestep * steps
         self._tracker.orient_elevation(nemlist, step)
 
-    def orient_down(self, nemlist, steps):
+    def elevation_down(self, nemlist, steps):
         step = -self._anglestep * steps
         self._tracker.orient_elevation(nemlist, step)
 
-    def orient_clockwise(self, nemlist, steps):
+    def azimuth_clockwise(self, nemlist, steps):
         step = self._anglestep * steps
         self._tracker.orient_azimuth(nemlist, step)
 
-    def orient_counter_clockwise(self, nemlist, steps):
+    def azimuth_counter_clockwise(self, nemlist, steps):
         step = -self._anglestep * steps
         self._tracker.orient_azimuth(nemlist, step)
 
 
-    def pitch_clockwise(self, nemlist, steps):
+    def pitch_up(self, nemlist, steps):
         step = self._anglestep * steps
         self._tracker.pitch(nemlist, step)
 
-    def pitch_counter_clockwise(self, nemlist, steps):
+    def pitch_down(self, nemlist, steps):
         step = -self._anglestep * steps
         self._tracker.pitch(nemlist, step)
 
@@ -447,10 +513,13 @@ class Shell(cmd.Cmd):
         self._pointer.point_azimuth(nemlist, step)
 
 
-    def help_pitch(self):
-        print('pitch NEMId cw|cc steps')
-
     def do_pitch(self, arg):
+        """
+        Adjust the pitch of one or more NEMs [u]p or [d]own
+        by one or more steps.
+
+        pitch NEMIds u|d [steps]
+        """
         toks = arg.split()
 
         try:
@@ -475,10 +544,13 @@ class Shell(cmd.Cmd):
         self._send()
 
 
-    def help_roll(self):
-        print('roll NEMId cw|cc steps')
-
     def do_roll(self, arg):
+        """
+        Adjust the roll of one or more NEMs [cw] clockwise or [cc]
+        counter-clockwise by one or more steps.
+
+        roll NEMIds cw|cc [steps]
+        """
         toks = arg.split()
 
         try:
@@ -503,10 +575,13 @@ class Shell(cmd.Cmd):
         self._send()
 
 
-    def help_yaw(self):
-        print('yaw NEMId cw|cc steps')
-
     def do_yaw(self, arg):
+        """
+        Adjust the yaw of one or more NEMs [cw] clockwise or [cc]
+        counter-clockwise by one or more steps.
+
+        yaw NEMIds cw|cc [steps]
+        """
         toks = arg.split()
 
         try:
@@ -531,10 +606,12 @@ class Shell(cmd.Cmd):
         self._send()
 
 
-    def help_select(self):
-        print('select NEMIds AntennaId')
-
     def do_select(self, arg):
+        """
+        Select the current antenna index for one or more NEMs.
+
+        select NEMIds AntennaId
+        """
         toks = arg.split()
 
         if not len(toks) == 2:
@@ -562,10 +639,15 @@ class Shell(cmd.Cmd):
             return
 
 
-    def help_pointat(self):
-        print('pointat srcNEMIds dstNEMId [track]')
-
     def do_pointat(self, arg):
+        """
+        Point the antenna of one or more NEMs (src) at another NEM
+        (dst).  Make the selection sticky with the track argument -
+        when the dstNEM moves, the srcNEMs automatically update
+        pointing to follow.
+
+        pointat srcNEMIds dstNEMId [track]
+        """
         toks = arg.split()
 
         if len(toks) < 2:
@@ -602,10 +684,13 @@ class Shell(cmd.Cmd):
         self._send()
 
 
-    def help_write(self):
-        print('write')
-
     def do_write(self, arg):
+        """
+        Write the current NEMs state to the State File at the
+        next timestep.
+
+        write
+        """
         if not self._statefd:
             self._statefd = open(self._statefile, 'w+')
 
@@ -614,10 +699,15 @@ class Shell(cmd.Cmd):
         self._writetime += self._timestep
 
 
-    def help_step(self):
-        print('step [steps]')
-
     def do_step(self, arg):
+        """
+        When launched with an EELFILE with more than one timepoint,
+        step forward or backwards by one or more time steps. A positive
+        timesteps value N move forward N state in the EEL file,
+        a negative value moves backward in time.
+
+        step [timesteps]
+        """
         steps = 1
 
         toks = arg.split()

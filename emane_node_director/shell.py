@@ -187,11 +187,16 @@ class Shell(cmd.Cmd):
 
         show [NEMIds]
         """
+        current_time = self._tracker.current_time
         current_pos = self._tracker.current
         current_dir = self._pointer.current
         current_pathloss = self._pathloss_calc.current
 
+        current_time_str = f'time: {current_time:.1f}'
         print()
+        print('-' * len(current_time_str))
+        print(current_time_str)
+        print('-' * len(current_time_str))
         if arg:
             nemstr = arg.split()[0]
             print(current_pos.loc[self._tracker.nemstr_to_nemlist(nemstr)])

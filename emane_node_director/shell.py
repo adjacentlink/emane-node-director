@@ -192,7 +192,8 @@ class Shell(cmd.Cmd):
         current_dir = self._pointer.current
         current_pathloss = self._pathloss_calc.current
 
-        current_time_str = f'time: {current_time:.1f}'
+        current_time_str = 'time: %.1f' % current_time
+
         print()
         print('-' * len(current_time_str))
         print(current_time_str)

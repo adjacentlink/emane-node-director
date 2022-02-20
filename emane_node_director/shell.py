@@ -236,7 +236,7 @@ class Shell(cmd.Cmd):
         try:
             nemlist = self._tracker.nemstr_to_nemlist(toks[0])
         except:
-            self.help_move()
+            self.do_help('move')
             return
 
         if not nemlist:
@@ -292,7 +292,7 @@ class Shell(cmd.Cmd):
         moveto srcNEMId dstNEMId
         """
         if len(arg) < 2:
-            self.help_moveto()
+            self.do_help('moveto')
             return
 
         toks = arg.split()
@@ -304,7 +304,7 @@ class Shell(cmd.Cmd):
             srcnems = self._tracker.nemstr_to_nemlist(toks[0])
             dstnems = self._tracker.nemstr_to_nemlist(toks[1])
         except:
-            self.help_moveto()
+            self.do_help('moveto')
             return
 
         if not srcnems:
@@ -332,7 +332,7 @@ class Shell(cmd.Cmd):
         movewith followerNEMIds leaderNEMId
         """
         if len(arg) < 2:
-            self.help_movewith()
+            self.do_help('movewith')
             return
 
         toks = arg.split()
@@ -344,7 +344,7 @@ class Shell(cmd.Cmd):
             srcnems = self._tracker.nemstr_to_nemlist(toks[0])
             dstnems = self._tracker.nemstr_to_nemlist(toks[1])
         except:
-            self.help_movewith()
+            self.do_help('movewith')
             return
 
         if not srcnems:
@@ -377,7 +377,7 @@ class Shell(cmd.Cmd):
         try:
             nemlist = self._tracker.nemstr_to_nemlist(toks[0])
         except:
-            self.help_azimuth()
+            self.do_help('azimuth')
             return
 
         if not nemlist:
@@ -408,7 +408,7 @@ class Shell(cmd.Cmd):
         try:
             nemlist = self._tracker.nemstr_to_nemlist(toks[0])
         except:
-            self.help_elevation()
+            self.do_help('elevation')
             return
 
         if not nemlist:
@@ -439,7 +439,7 @@ class Shell(cmd.Cmd):
         try:
             nemlist = self._pointer.nemstr_to_nemlist(toks[0])
         except:
-            self.help_point()
+            self.do_help('point')
             return
 
         if not nemlist:
@@ -531,7 +531,7 @@ class Shell(cmd.Cmd):
         try:
             nemlist = self._tracker.nemstr_to_nemlist(toks[0])
         except:
-            self.help_pitch()
+            self.do_help('pitch')
             return
 
         if not nemlist:
@@ -562,7 +562,7 @@ class Shell(cmd.Cmd):
         try:
             nemlist = self._tracker.nemstr_to_nemlist(toks[0])
         except:
-            self.help_roll()
+            self.do_help('roll')
             return
 
         if not nemlist:
@@ -593,7 +593,7 @@ class Shell(cmd.Cmd):
         try:
             nemlist = self._tracker.nemstr_to_nemlist(toks[0])
         except:
-            self.help_yaw()
+            self.do_help('yaw')
             return
 
         if not nemlist:
@@ -621,7 +621,7 @@ class Shell(cmd.Cmd):
         toks = arg.split()
 
         if not len(toks) == 2:
-            self.help_select()
+            self.do_help('select')
             return
 
         nemlist = []
@@ -629,7 +629,7 @@ class Shell(cmd.Cmd):
         try:
             nemlist = self._pointer.nemstr_to_nemlist(toks[0])
         except:
-            self.help_select()
+            self.do_help('select')
             return
 
         if not nemlist:
@@ -657,7 +657,7 @@ class Shell(cmd.Cmd):
         toks = arg.split()
 
         if len(toks) < 2:
-            self.help_pointat()
+            self.do_help('pointat')
             return
 
         srcnems = []
@@ -667,7 +667,7 @@ class Shell(cmd.Cmd):
             srcnems = self._pointer.nemstr_to_nemlist(toks[0])
             dstnems = self._tracker.nemstr_to_nemlist(toks[1])
         except:
-            self.help_pointat()
+            self.do_help('pointat')
             return
 
         if not srcnems:

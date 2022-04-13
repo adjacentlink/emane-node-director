@@ -1,6 +1,6 @@
 AC_COPYRIGHT([
 
-  Copyright (c) 2020 - Adjacent Link LLC, Bridgewater, New Jersey
+  Copyright (c) 2020-2022 - Adjacent Link LLC, Bridgewater, New Jersey
   All rights reserved.
  
   Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,7 @@ AC_COPYRIGHT([
  
 ])
 
-AC_INIT([emane-node-director],0.2.1,[labs at adjacentlink dot com])
+AC_INIT([emane-node-director],0.2.2,[labs at adjacentlink dot com])
 
 AM_INIT_AUTOMAKE([1.9.6])
 

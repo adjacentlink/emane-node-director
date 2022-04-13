@@ -19,9 +19,7 @@ RUN apt-get -y install git autoconf automake libtool dh-python debhelper pkg-con
 RUN git clone https://github.com/adjacentlink/emane-node-director -b develop
 
 WORKDIR emane-node-director
-RUN ./autogen.sh
-RUN ./configure
-RUN make deb
+RUN ./autogen.sh && ./configure && make deb
 RUN cp $(find .debbuild -name "*\.deb") /opt/built
 RUN dpkg -i /opt/built/*; apt-get -y install -f
 

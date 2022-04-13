@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2021-2022 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -43,7 +43,7 @@ class PathlossCalculator(object):
 
         self._algorithm = PropagationModelAlgorithm(args.pathloss, args.frequency)
 
-        self._current_df = DataFrame([], columns=['nem1', 'nem2', 'pathloss'])
+        self._current_df = DataFrame([], columns=['nem1', 'nem2', 'pathloss', 'meters'])
 
         self._current_df.set_index(['nem1', 'nem2'], inplace=True)
 
@@ -56,7 +56,7 @@ class PathlossCalculator(object):
     def update(self):
         rows = self._algorithm.compute(self._tracker.current)
 
-        self._current_df = DataFrame(rows, columns=['nem1', 'nem2', 'pathloss'])
+        self._current_df = DataFrame(rows, columns=['nem1', 'nem2', 'pathloss', 'meters'])
 
         self._current_df.set_index(['nem1', 'nem2'], inplace=True)
 

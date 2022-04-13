@@ -16,9 +16,7 @@ RUN yum -y install git make python-devel python-setuptools autoconf automake lib
 
 RUN git clone https://github.com/adjacentlink/emane-node-director -b develop
 WORKDIR emane-node-director
-RUN ./autogen.sh
-RUN ./configure --with-python2
-RUN make rpm
+RUN ./autogen.sh && ./configure --with-python2 && make rpm
 RUN cp $(find .rpmbuild/RPMS -name "*\.rpm") /opt/built
 RUN yum -y install /opt/built/*
 

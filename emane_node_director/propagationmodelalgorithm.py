@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2021-2022 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -61,7 +61,9 @@ class TwoRayAlgorithm(object):
             if nem1 == nem2:
                 continue
 
-            dist = max(distance_to(loc1, loc2)[0], MIN_DISTANCE_METERS)
+            distance_meters = distance_to(loc1, loc2)[0]
+
+            dist = max(distance_meters, MIN_DISTANCE_METERS)
 
             alt1 = max(loc1.alt, MIN_ALTITUDE_METERS)
 
@@ -69,7 +71,7 @@ class TwoRayAlgorithm(object):
 
             pathloss = (40.0 * math.log10(dist)) - (20.0 * (math.log10(alt1) + math.log10(alt2)))
 
-            pathlosses.append((nem1, nem2, pathloss))
+            pathlosses.append((nem1, nem2, pathloss, dist))
 
         return pathlosses
 
@@ -97,12 +99,14 @@ class FreespaceAlgorithm(object):
             if nem1 == nem2:
                 continue
 
-            dist = max(distance_to(loc1, loc2)[0], MIN_DISTANCE_METERS)
+            distance_meters = distance_to(loc1, loc2)[0]
+
+            dist = max(distance_meters, MIN_DISTANCE_METERS)
 
             pathloss = 20.0 * math.log10(FreespaceAlgorithm.FSPL_CONST * \
                                          (self._frequency / 1000000.0) * (dist/1000.0))
 
-            pathlosses.append((nem1, nem2, pathloss))
+            pathlosses.append((nem1, nem2, pathloss, dist))
 
         return pathlosses
 

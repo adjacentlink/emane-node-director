@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2020 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2020-2022 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -106,7 +106,7 @@ class NodeTracker(object):
                                          columns=['nem','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
                     state_df.set_index('nem', inplace=True)
                     state_df.sort_index(inplace=True)
-                    states.append(state_df)
+                    states.append((last_eventtime, state_df))
                 last_eventtime = eventtime
 
             # -Inf   nem:45 location gps 40.025495,-74.315441,3.0
@@ -138,7 +138,7 @@ class NodeTracker(object):
                              columns=['nem','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
         state_df.set_index('nem', inplace=True)
         state_df.sort_index(inplace=True)
-        states.append(state_df)
+        states.append((last_eventtime, state_df))
 
         return states
 
@@ -182,7 +182,7 @@ class NodeTracker(object):
     def reset(self, index=0):
         # start back at first state
         self._stateidx = index
-        self._state_df = self._states[self._stateidx]
+        self._state_time, self._state_df = self._states[self._stateidx]
 
         # delta positions are 0 to start. just copy the state_df
         # positions and subtract it off to get all 0s
@@ -386,6 +386,11 @@ class NodeTracker(object):
         return self._delta_df + self._state_df
 
 
+    @property
+    def current_time(self):
+        return self._state_time
+
+
     def step(self, steps):
         new_state_index = None
 
@@ -399,6 +404,6 @@ class NodeTracker(object):
         # we don't reset on a step, preserve any translations
         # that have been done, and preserve tracking
         self._stateidx = new_state_index
-        self._state_df = self._states[self._stateidx]
+        self._state_time, self._state_df = self._states[self._stateidx]
 
         self.update()

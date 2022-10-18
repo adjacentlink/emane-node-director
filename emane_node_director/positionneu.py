@@ -76,7 +76,7 @@ class PositionNEU(object):
                 dUpMeters_    * sin(dPitchRadians)
 
             dRotatedEastMeters = \
-                -dNorthMeters_ * (cos(dYawRadians)   * sin(dPitchRadians) * sin(dRollRadians) + \
+                dNorthMeters_ * (cos(dYawRadians)   * sin(dPitchRadians) * sin(dRollRadians) - \
                                   sin(dYawRadians)      * cos(dRollRadians))  + \
                 dEastMeters_  * (cos(dYawRadians)   * cos(dRollRadians)  + \
                                  sin(dYawRadians)      * sin(dPitchRadians)  * sin(dRollRadians)) - \

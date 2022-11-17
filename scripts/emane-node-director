@@ -139,7 +139,13 @@ Move emane NEM locations.'''
 
     args = parser.parse_args()
 
-    mcgroup,port = args.eventservicegroup.split(':')
+    toks = args.eventservicegroup.split(':')
+
+    if not len(toks) == 2:
+        print('eventservicegroup must be in form address:port')
+        exit(1)
+
+    mcgroup,port = toks
 
     service = None
 

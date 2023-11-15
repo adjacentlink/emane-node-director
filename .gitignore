@@ -22,3 +22,4 @@ On branch develop
 emane-node-director*.tar.gz
 .rpmbuild
 .debbuild
+emane-node-director.spec

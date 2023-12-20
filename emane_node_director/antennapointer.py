@@ -63,20 +63,20 @@ class AntennaPointer(object):
     def update(self):
         current_pos = self._tracker.current
 
-        for tracking_nem,row in self._current_df.iterrows():
+        for tracking_node,row in self._current_df.iterrows():
             if not row.tracking:
                 continue
 
-            tracked_nem = row.tracking
+            tracked_node = row.tracking
 
-            remote = current_pos.loc[tracked_nem]
+            remote = current_pos.loc[tracked_node]
 
-            local = current_pos.loc[tracking_nem]
+            local = current_pos.loc[tracking_node]
 
             az, el = calculateDirection(local, remote)
 
-            self._current_df.loc[(tracking_nem,'az')] = az
-            self._current_df.loc[(tracking_nem,'el')] = el
+            self._current_df.loc[(tracking_node,'az')] = az
+            self._current_df.loc[(tracking_node,'el')] = el
 
         for observer in self._observers:
             observer.update()
@@ -128,72 +128,72 @@ class AntennaPointer(object):
             if not eventtime == last_eventtime:
                 if last_eventtime is not None:
                     state_df = DataFrame(list(rows.values()),
-                                         columns=['nem','ant_num','az','el','tracking'])
+                                         columns=['nodeid','ant_num','az','el','tracking'])
                     try:
                         # this seems necessary for python3
                         state_df = state_df.astype({'ant_num':int,'tracking':int})
                     except:
                         pass
-                    state_df.set_index('nem', inplace=True)
+                    state_df.set_index('nodeid', inplace=True)
                     state_df.sort_index(inplace=True)
                     states.append(state_df)
                 last_eventtime = eventtime
 
-            nem = int(moduleid.split(':')[1])
+            nodeid = int(moduleid.split(':')[1])
             ant_num = int(eventargs[0])
             az = float(eventargs[1])
             el = float(eventargs[2])
 
-            rows[nem] = (nem,ant_num,az,el,0)
+            rows[nodeid] = (nodeid,ant_num,az,el,0)
 
         state_df = DataFrame(list(rows.values()),
-                             columns=['nem','ant_num','az','el','tracking'])
+                             columns=['nodeid','ant_num','az','el','tracking'])
         try:
             # this seems necessary for python3
             state_df = state_df.astype({'ant_num':int,'tracking':int})
         except:
             pass
-        state_df.set_index('nem', inplace=True)
+        state_df.set_index('nodeid', inplace=True)
         state_df.sort_index(inplace=True)
         states.append(state_df)
 
         return states
 
 
-    def nemstr_to_nemlist(self, nemstr):
-        nems=[]
+    def nodeidstr_to_nodeidlist(self, nodeidstr):
+        nodeids=[]
 
-        if not nemstr:
-            return nems
+        if not nodeidstr:
+            return nodeids
 
-        if len(nemstr.strip()) == 0:
-            return nems
+        if len(nodeidstr.strip()) == 0:
+            return nodeids
 
-        nemranges = nemstr.split(',')
+        nodeidranges = nodeidstr.split(',')
 
-        for nemrange in nemranges:
-            endpoints = nemrange.split('-')
+        for nodeidrange in nodeidranges:
+            endpoints = nodeidrange.split('-')
 
             startendpoint = int(endpoints[0])
 
             stopendpoint = int(endpoints[-1])
 
-            newnems = []
+            newnodeids = []
 
             if startendpoint > stopendpoint:
-                newnems = [ i for i in range(startendpoint,stopendpoint-1,-1) ]
+                newnodeids = [ i for i in range(startendpoint,stopendpoint-1,-1) ]
             else:
-                newnems = [ i for i in range(startendpoint,stopendpoint+1) ]
+                newnodeids = [ i for i in range(startendpoint,stopendpoint+1) ]
 
-            for i in newnems:
-                if not i in nems:
-                    nems.append(i)
+            for i in newnodeids:
+                if not i in nodeids:
+                    nodeids.append(i)
 
-        known_nems = self._state_df.index.unique()
+        known_nodeids = self._state_df.index.unique()
 
-        found_nems = [ nem for nem in nems if nem in known_nems ]
+        found_nodeids = [ nodeid for nodeid in nodeids if nodeid in known_nodeids ]
 
-        return found_nems
+        return found_nodeids
 
 
     def reset(self, index=0):
@@ -204,35 +204,35 @@ class AntennaPointer(object):
         self._current_df = self._state_df.copy()
 
 
-    def point_elevation(self, nemlist, step):
-        for nem in nemlist:
-            self._current_df.loc[(nem,'el')] += step
+    def point_elevation(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._current_df.loc[(nodeid,'el')] += step
 
 
-    def point_azimuth(self, nemlist, step):
-        for nem in nemlist:
-            self._current_df.loc[(nem,'az')] += step
+    def point_azimuth(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._current_df.loc[(nodeid,'az')] += step
 
 
-    def select(self, nemlist, ant_num):
-        for nem in nemlist:
-            self._current_df.loc[(nem,'ant_num')] = ant_num
+    def select(self, nodeidlist, ant_num):
+        for nodeid in nodeidlist:
+            self._current_df.loc[(nodeid,'ant_num')] = ant_num
 
 
-    def point_at(self, src_nemlist, dstnem, track):
-        for srcnem in src_nemlist:
-            if srcnem == dstnem:
-                print('Ignoring same source, destination "%d"' % srcnem)
+    def point_at(self, src_nodeidlist, dstnodeid, track):
+        for srcnodeid in src_nodeidlist:
+            if srcnodeid == dstnodeid:
+                print('Ignoring same source, destination "%d"' % srcnodeid)
                 continue
 
-            local = self._tracker.current.loc[srcnem]
-            remote = self._tracker.current.loc[dstnem]
+            local = self._tracker.current.loc[srcnodeid]
+            remote = self._tracker.current.loc[dstnodeid]
             az,el = calculateDirection(local, remote)
-            self._current_df.loc[(srcnem,'az')] = az
-            self._current_df.loc[(srcnem,'el')] = el
+            self._current_df.loc[(srcnodeid,'az')] = az
+            self._current_df.loc[(srcnodeid,'el')] = el
 
             if track:
-                self._current_df.loc[(srcnem,'tracking')] = dstnem
+                self._current_df.loc[(srcnodeid,'tracking')] = dstnodeid
 
 
     @property

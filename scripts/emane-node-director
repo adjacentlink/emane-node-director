@@ -46,7 +46,7 @@ except:
 
 def main():
     usage = '''
-Move emane NEM locations.'''
+Direct EMANE node location, orientation and pointing.'''
 
     parser = argparse.ArgumentParser( \
                 prog='emane-node-director',
@@ -108,7 +108,7 @@ Move emane NEM locations.'''
                         None (run immediately).''')
     parser.add_argument('eelfile',
                         metavar='EELFILE',
-                        help='''The EELFILE used for nem initial postions.''')
+                        help='''An EELFILE used to determine the nodes to be controlled.''')
     parser.add_argument('--batch',
                         metavar='BATCHFILE',
                         default=None,

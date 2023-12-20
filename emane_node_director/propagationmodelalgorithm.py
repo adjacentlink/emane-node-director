@@ -57,8 +57,8 @@ class TwoRayAlgorithm(object):
         """
         pathlosses = []
 
-        for (nem1, loc1), (nem2, loc2) in pairs:
-            if nem1 == nem2:
+        for (nodeid1, loc1), (nodeid2, loc2) in pairs:
+            if nodeid1 == nodeid2:
                 continue
 
             distance_meters = distance_to(loc1, loc2)[0]
@@ -71,7 +71,7 @@ class TwoRayAlgorithm(object):
 
             pathloss = (40.0 * math.log10(dist)) - (20.0 * (math.log10(alt1) + math.log10(alt2)))
 
-            pathlosses.append((nem1, nem2, pathloss, dist))
+            pathlosses.append((nodeid1, nodeid2, pathloss, dist))
 
         return pathlosses
 
@@ -95,8 +95,8 @@ class FreespaceAlgorithm(object):
         """
         pathlosses = []
 
-        for (nem1, loc1), (nem2, loc2) in pairs:
-            if nem1 == nem2:
+        for (nodeid1, loc1), (nodeid2, loc2) in pairs:
+            if nodeid1 == nodeid2:
                 continue
 
             distance_meters = distance_to(loc1, loc2)[0]
@@ -106,7 +106,7 @@ class FreespaceAlgorithm(object):
             pathloss = 20.0 * math.log10(FreespaceAlgorithm.FSPL_CONST * \
                                          (self._frequency / 1000000.0) * (dist/1000.0))
 
-            pathlosses.append((nem1, nem2, pathloss, dist))
+            pathlosses.append((nodeid1, nodeid2, pathloss, dist))
 
         return pathlosses
 

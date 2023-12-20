@@ -145,6 +145,11 @@ Direct EMANE node location, orientation and pointing.'''
         print('eventservicegroup must be in form address:port')
         exit(1)
 
+    # eelfile must be present
+    if not os.path.exists(args.eelfile):
+        print('EEL file "{args.eelfile}" does not exist', file=sys.stderr)
+        exit(1)
+
     mcgroup,port = toks
 
     service = None

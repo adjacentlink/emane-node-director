@@ -30,10 +30,8 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-from __future__ import absolute_import, division, print_function
-import os
-
 from pandas import DataFrame
+from emane_node_director.eelparser import EELParser
 from emane_node_director.positionorientationvelocity import calculateDirection
 
 
@@ -83,68 +81,7 @@ class AntennaPointer(object):
 
 
     def _eelfile_to_dataframe_states(self, eelfile):
-        states = []
-        rows = {}
-
-        # eelfile must be present
-        if not os.path.exists(eelfile):
-            raise RuntimeError('EEL file "%s" does not exist' % eelfile)
-
-        last_eventtime = None
-
-        # process eel lines
-        lineno = 0
-        for line in open(eelfile, 'r'):
-            lineno += 1
-
-            line = line.strip()
-
-            # skip blank lines
-            if len(line) == 0:
-                continue
-
-            # skip comment lines
-            if line[0] == '#':
-                continue
-
-            toks = line.split()
-
-            # skip non-blank lines with too few tokens
-            if len(toks)>0 and len(toks)<3:
-                raise RuntimeError('Malformed EEL line %s:%d' %
-                                   (eelfile, lineno))
-
-            # -Inf nem:601 antennaprofile 3,251.29,0.031
-            eventtime = float(toks[0])
-            moduleid = toks[1]
-            eventtype = toks[2]
-            eventargs = ','.join(toks[3:])
-            eventargs = eventargs.split(',')
-
-            # ignore other events
-            if not eventtype == 'antennaprofile':
-                continue
-
-            if not eventtime == last_eventtime:
-                if last_eventtime is not None:
-                    state_df = DataFrame(list(rows.values()),
-                                         columns=['nodeid','ant_num','az','el','tracking'])
-                    try:
-                        # this seems necessary for python3
-                        state_df = state_df.astype({'ant_num':int,'tracking':int})
-                    except:
-                        pass
-                    state_df.set_index('nodeid', inplace=True)
-                    state_df.sort_index(inplace=True)
-                    states.append(state_df)
-                last_eventtime = eventtime
-
-            nodeid = int(moduleid.split(':')[1])
-            ant_num = int(eventargs[0])
-            az = float(eventargs[1])
-            el = float(eventargs[2])
-
-            rows[nodeid] = (nodeid,ant_num,az,el,0)
+        states,rows,last_eventtime = EELParser().parse_antenna_pointings(eelfile)
 
         state_df = DataFrame(list(rows.values()),
                              columns=['nodeid','ant_num','az','el','tracking'])

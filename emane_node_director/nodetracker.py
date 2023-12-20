@@ -31,8 +31,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-from __future__ import absolute_import, division, print_function
-from collections import defaultdict
+from emane_node_director.eelparser import EELParser
 import os
 from pandas import DataFrame
 
@@ -58,81 +57,7 @@ class NodeTracker(object):
 
 
     def _eelfile_to_dataframe_states(self, eelfile):
-        states = []
-
-        rows = defaultdict(lambda: [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0])
-
-        # eelfile must be present
-        if not os.path.exists(eelfile):
-            raise RuntimeError('EEL file "%s" does not exist' % eelfile)
-
-        last_eventtime = None
-
-        # process eel lines
-        lineno = 0
-        for line in open(eelfile, 'r'):
-            lineno += 1
-
-            line = line.strip()
-
-            # skip blank lines
-            if len(line) == 0:
-                continue
-
-            # skip comment lines
-            if line[0] == '#':
-                continue
-
-            toks = line.split()
-
-            # skip non-blank lines with too few tokens
-            if len(toks)>0 and len(toks)<3:
-                raise RuntimeError('Malformed EEL line %s:%d' %
-                                   (eelfile, lineno))
-
-            eventtime = float(toks[0])
-            moduleid = toks[1]
-            eventtype = toks[2]
-            eventargs = ','.join(toks[3:])
-            eventargs = eventargs.split(',')
-
-            # ignore other events
-            if not (eventtype == 'location' or eventtype == 'velocity' or eventtype == 'orientation'):
-                continue
-
-            if not eventtime == last_eventtime:
-                if last_eventtime is not None:
-                    state_df = DataFrame(list(rows.values()),
-                                         columns=['nodeid','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
-                    state_df.set_index('nodeid', inplace=True)
-                    state_df.sort_index(inplace=True)
-                    states.append((last_eventtime, state_df))
-                last_eventtime = eventtime
-
-            # -Inf   nem:45 location gps 40.025495,-74.315441,3.0
-            # <time> nem:<Id> velocity <azimuth>,<elevation>,<magnitude>
-            # <time> nem:<Id> orientation <pitch>,<roll>,<yaw>
-            event_nodeid = int(moduleid.split(':')[1])
-
-            if eventtype == 'location':
-                lat, lon, alt = list(map(float, eventargs[1:]))
-                row = rows[event_nodeid]
-                row[0] = event_nodeid
-                row[1] = lat
-                row[2] = lon
-                row[3] = alt
-            elif eventtype == 'velocity':
-                az, el, speed = list(map(float, eventargs))
-                row[0] = event_nodeid
-                row[4] = az
-                row[5] = el
-                row[6] = speed
-            elif eventtype == 'orientation':
-                pitch, roll, yaw = list(map(float, eventargs))
-                row[0] = event_nodeid
-                row[7] = pitch
-                row[8] = roll
-                row[9] = yaw
+        states,rows,last_eventtime = EELParser().parse_pov(eelfile)
 
         state_df = DataFrame(list(rows.values()),
                              columns=['nodeid','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])

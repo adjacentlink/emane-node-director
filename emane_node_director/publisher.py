@@ -45,10 +45,11 @@ class EventServicePublisher:
         self._service = service
 
 
-    def publish_locations(self, current_df):
+    def publish_locations(self, current_state):
         event = LocationEvent()
 
-        for nodeid, loc in current_df.iterrows():
+        print(type(current_state.iterrows()))
+        for nodeid,loc in current_state.iterrows():
             event.append(nodeid,
                          latitude=loc.lat,
                          longitude=loc.lon,
@@ -63,19 +64,19 @@ class EventServicePublisher:
         self._service.publish(0, event)
 
 
-    def publish_antenna_profiles(self, current_df):
+    def publish_antenna_profiles(self, current_state):
         event = AntennaProfileEvent()
 
-        for nodeid, pnt in current_df.iterrows():
+        for nodeid, pnt in current_state.iterrows():
             event.append(nemId=nodeid, profile=int(pnt.ant_num), azimuth=pnt.az, elevation=pnt.el)
 
         self._service.publish(0, event)
 
 
-    def publish_pathlosses(self, current_df):
+    def publish_pathlosses(self, current_state):
         pathloss_events = defaultdict(lambda: PathlossEvent())
 
-        for (nodeid1, nodeid2), row in current_df.iterrows():
+        for (nodeid1, nodeid2), row in current_state.iterrows():
             pathloss_events[nodeid2].append(nodeid1, forward=row.pathloss)
 
         for nodeid2, event in pathloss_events.items():

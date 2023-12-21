@@ -33,7 +33,6 @@
 
 from emane_node_director.eelparser import EELParser
 import os
-from pandas import DataFrame
 
 
 class NodeTracker(object):
@@ -42,7 +41,7 @@ class NodeTracker(object):
 
         self._observers = set([])
 
-        self._states = self._eelfile_to_dataframe_states(eelfile)
+        self._states = EELParser().parse_pov(eelfile)
 
         self.reset()
 
@@ -54,18 +53,6 @@ class NodeTracker(object):
     def update(self):
         for observer in self._observers:
             observer.update()
-
-
-    def _eelfile_to_dataframe_states(self, eelfile):
-        states,rows,last_eventtime = EELParser().parse_pov(eelfile)
-
-        state_df = DataFrame(list(rows.values()),
-                             columns=['nodeid','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
-        state_df.set_index('nodeid', inplace=True)
-        state_df.sort_index(inplace=True)
-        states.append((last_eventtime, state_df))
-
-        return states
 
 
     def nodeidstr_to_nodeidlist(self, nodeidstr):
@@ -97,7 +84,7 @@ class NodeTracker(object):
                 if not i in nodeids:
                     nodeids.append(i)
 
-        known_nodeids = self._state_df.index.unique()
+        known_nodeids = self._state.nodeids()
 
         found_nodeids = [ nodeid for nodeid in nodeids if nodeid in known_nodeids ]
 
@@ -107,20 +94,18 @@ class NodeTracker(object):
     def reset(self, index=0):
         # start back at first state
         self._stateidx = index
-        self._state_time, self._state_df = self._states[self._stateidx]
+        self._state_time,self._state = self._states[self._stateidx]
 
-        # delta positions are 0 to start. just copy the state_df
+        # delta positions are 0 to start. just copy the state
         # positions and subtract it off to get all 0s
-        self._delta_df = self._state_df.copy()
-        self._delta_df -= self._state_df
-
+        self._delta_state = self._state.zero()
         self.update()
 
 
     def move_lon(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            lon = self.current.loc[nodeid].lon
-
+            lon = self.current.get_cell(nodeid, 'lon')
+            print(f'xxx lon={lon}')
             delta = 0.0
             # restrict current lon to range [-180.0, 180.0]
             # TODO, need to deal with wrap around at 180 to -180
@@ -131,7 +116,7 @@ class NodeTracker(object):
             else:
                 delta = step
 
-            self._delta_df.loc[(nodeid,'lon')] += delta
+            self._delta_state.add_cell(nodeid,'lon',delta)
 
             # now also check if another nodeid is tracking this one
             # and move it too
@@ -148,14 +133,14 @@ class NodeTracker(object):
                     else:
                         delta2 = step
 
-                    self._delta_df.loc[(trackingnodeid,'lon')] += delta2
+                    self._delta_state.add_cell(trackingnodeid,'lon',delta2)
 
         self.update()
 
 
     def move_lat(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            lat = self.current.loc[nodeid].lat
+            lat = self.current.get_cell(nodeid, 'lat')
 
             delta = 0.0
 
@@ -167,7 +152,7 @@ class NodeTracker(object):
             else:
                 delta = step
 
-            self._delta_df.loc[(nodeid,'lat')] += delta
+            self._delta_state.add_cell(nodeid,'lat',delta)
 
             # now also check if another nodeid is tracking this one
             # and move it too
@@ -184,14 +169,14 @@ class NodeTracker(object):
                     else:
                         delta2 = step
 
-                    self._delta_df.loc[(trackingnodeid,'lat')] += delta2
+                    self._delta_state.add_cell(trackingnodeid,'lat',delta2)
 
         self.update()
 
 
     def move_alt(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            alt = self.current.loc[nodeid].alt
+            alt = self.current.get_cell(nodeid, 'alt')
 
             delta = 0.0
 
@@ -201,7 +186,7 @@ class NodeTracker(object):
             else:
                 delta = step
 
-            self._delta_df.loc[(nodeid,'alt')] += delta
+            self._delta_state.add_cell(nodeid,'alt',delta)
 
             # now also check if another nodeid is tracking this one
             # and move it too
@@ -216,7 +201,7 @@ class NodeTracker(object):
                     else:
                         delta2 = step
 
-                    self._delta_df.loc[(trackingnodeid,'alt')] += delta2
+                    self._delta_state.add_cell(trackingnodeid,'alt',delta2)
 
         self.update()
 
@@ -227,14 +212,14 @@ class NodeTracker(object):
         # as the anchornodeid do the dstnodeid
         anchornodeid = srcnodeids[0]
 
-        delta = self.current.loc[dstnodeid] - self.current.loc[anchornodeid]
+        delta = self.current.get_row(dstnodeid) - self.current.get_row(anchornodeid)
 
         for nodeid in srcnodeids:
-            self._delta_df.loc[nodeid] += delta
+            self._delta_state.add_row(nodeid, delta)
 
             for trackingnodeid,row in self.current.iterrows():
                 if row.tracking == nodeid:
-                    self._delta_df.loc[trackingnodeid] += delta
+                    self._delta_state.add_row(trackingnodeid, delta)
 
         self.update()
 
@@ -243,72 +228,72 @@ class NodeTracker(object):
         # movewith sets srcnodeids "tracking" column to the
         # dstnodeid id. when the dstnodeid moves, the source nodeids
         # move in the same fixed translation. This is
-        # placed in the delta_df so that is is "sticky"
+        # placed in the delta so that is is "sticky"
         # across time steps
         for srcnodeid in srcnodeids:
             if srcnodeid == dstnodeid:
                 print('Ignoring same source, destination "%d"' % srcnodeid)
                 continue
 
-            self._delta_df.loc[(srcnodeid,'tracking')] = dstnodeid
+            self._delta_state.set_cell(srcnodeid,'tracking',dstnodeid)
 
 
     def orient_elevation(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            self._delta_df.loc[(nodeid,'el')] += step
+            self._delta_state.add_cell(nodeid, 'el', step)
 
             for trackingnodeid,row in self.current.iterrows():
                 if row.tracking == nodeid:
-                    self._delta_df.loc[(trackingnodeid,'el')] += step
+                    self._delta_state.add_cell(trackingnodeid, 'el', step)
 
         self.update()
 
 
     def orient_azimuth(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            self._delta_df.loc[(nodeid,'az')] += step
+            self._delta_state.add_cell(nodeid,'az', step)
 
             for trackingnodeid,row in self.current.iterrows():
                 if row.tracking == nodeid:
-                    self._delta_df.loc[(trackingnodeid,'az')] += step
+                    self._delta_state.add_cell(trackingnodeid,'az', step)
 
         self.update()
 
 
     def pitch(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            self._delta_df.loc[(nodeid, 'pitch')] += step
+            self._delta_state.add_cell(nodeid, 'pitch', step)
 
             for trackingnodeid,row in self.current.iterrows():
                 if row.tracking == nodeid:
-                    self._delta_df.loc[(trackingnodeid,'pitch')] += step
+                    self._delta_state.add_cell(trackingnodeid, 'pitch', step)
 
         self.update()
 
     def roll(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            self._delta_df.loc[(nodeid, 'roll')] += step
+            self._delta_state.add_cell(nodeid, 'roll', step)
 
             for trackingnodeid,row in self.current.iterrows():
                 if row.tracking == nodeid:
-                    self._delta_df.loc[(trackingnodeid,'roll')] += step
+                    self._delta_state.add_cell(trackingnodeid,'roll',step)
 
         self.update()
 
     def yaw(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            self._delta_df.loc[(nodeid, 'yaw')] += step
+            self._delta_state.add_cell(nodeid, 'yaw', step)
 
             for trackingnodeid,row in self.current.iterrows():
                 if row.tracking == nodeid:
-                    self._delta_df.loc[(trackingnodeid,'yaw')] += step
+                    self._delta_state.add_cell(trackingnodeid, 'yaw', step)
 
         self.update()
 
 
     @property
     def current(self):
-        return self._delta_df + self._state_df
+        return self._delta_state + self._state
 
 
     @property
@@ -329,6 +314,6 @@ class NodeTracker(object):
         # we don't reset on a step, preserve any translations
         # that have been done, and preserve tracking
         self._stateidx = new_state_index
-        self._state_time, self._state_df = self._states[self._stateidx]
+        self._state_time, self._state = self._states[self._stateidx]
 
         self.update()

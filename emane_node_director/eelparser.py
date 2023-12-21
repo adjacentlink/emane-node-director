@@ -30,11 +30,23 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 from collections import defaultdict
+import re
+import sys
+
+from pandas import DataFrame
+
+from emane_node_director.dataframewrapper import DataFrameWrapper
 
 
 class EELParser:
     def parse_pov(self, eelfile):
         states = []
+
+        column_names=['nodeid','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking']
+
+        all_nemids_set = set([])
+
+        nemid_to_node = {}
 
         rows = defaultdict(lambda: [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0])
 
@@ -51,8 +63,13 @@ class EELParser:
             if len(line) == 0:
                 continue
 
-            # skip comment lines
+            # comment line, check for user embedding of nem to node information in form
+            # nem:NEMID node:NODENAME
             if line[0] == '#':
+                m = re.search(r'#\s*nem:\s*(?P<nemid>\d+)\s+node:\s*(?P<node>[\w\-]+)\s*', line)
+
+                if m:
+                    nemid_to_node[int(m.group('nemid'))] = m.group('node')
                 continue
 
             toks = line.split()
@@ -74,11 +91,10 @@ class EELParser:
 
             if not eventtime == last_eventtime:
                 if last_eventtime is not None:
-                    state_df = DataFrame(list(rows.values()),
-                                         columns=['nodeid','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
+                    state_df = DataFrame(list(rows.values()), columns=column_names)
                     state_df.set_index('nodeid', inplace=True)
-                    state_df.sort_index(inplace=True)
                     states.append((last_eventtime, state_df))
+
                 last_eventtime = eventtime
 
             # -Inf   nem:45 location gps 40.025495,-74.315441,3.0
@@ -93,20 +109,54 @@ class EELParser:
                 row[1] = lat
                 row[2] = lon
                 row[3] = alt
+                all_nemids_set.add(event_nodeid)
             elif eventtype == 'velocity':
                 az, el, speed = list(map(float, eventargs))
                 row[0] = event_nodeid
                 row[4] = az
                 row[5] = el
                 row[6] = speed
+                all_nemids_set.add(event_nodeid)
             elif eventtype == 'orientation':
                 pitch, roll, yaw = list(map(float, eventargs))
                 row[0] = event_nodeid
                 row[7] = pitch
                 row[8] = roll
                 row[9] = yaw
+                all_nemids_set.add(event_nodeid)
 
-        return states,rows,last_eventtime
+        state_df = DataFrame(list(rows.values()), columns=column_names)
+        state_df.set_index('nodeid', inplace=True)
+        states.append((last_eventtime, state_df))
+
+        nemid_to_index_map = {id:id for id in all_nemids_set}
+
+        if nemid_to_node:
+            if not all_nemids_set.issubset(nemid_to_node.keys()):
+                # user supplied a mapping but didn't get them all
+                # so don't add a node column
+                missed_nems = ','.join(map(str, all_nemids_set.difference(nemid_to_node.keys())))
+                print(f'User define nem to node mapping missing nems '
+                      f'{missed_nems}, will not show nodes',
+                      file=sys.stderr)
+            else:
+                nemid_to_index_map = {id:(id,nemid_to_node[id]) for id in all_nemids_set}
+
+                # add node column according to mapping, nodeid is now index
+                # so remove from cols and add node at front
+                for _,state_df in states:
+                    state_df.reset_index(inplace=True)
+                    state_df['node'] = state_df.nodeid.apply(lambda x: nemid_to_node[x])
+                    state_df.set_index(['nodeid','node'], inplace=True)
+
+        output_states = []
+        for tstamp,state_df in states:
+            state_df.sort_index(inplace=True)
+
+            output_states.append(
+                (tstamp, DataFrameWrapper(state_df, nemid_to_index_map)))
+
+        return output_states
 
 
     def parse_antenna_pointings(self, eelfile):

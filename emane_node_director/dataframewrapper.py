@@ -47,6 +47,10 @@ class DataFrameWrapper:
     def zero(self):
         return DataFrameWrapper(self._df.copy() - self._df, self._id_to_index_map)
 
+    @property
+    def empty(self):
+        return self._df.empty
+
     def copy(self):
         return DataFrameWrapper(self._df.copy(),  self._id_to_index_map)
 
@@ -64,7 +68,10 @@ class DataFrameWrapper:
 
     def get_row(self, id):
         return self._df.loc[self._id_to_index_map[id]]
-        
+
+    def get_rows(self, idlist):
+        return self._df.loc[[self._id_to_index_map[id] for id in idlist]]
+
     def add_row(self, id, addend_row):
         self._df.loc[self._id_to_index_map[id]] += addend_row
 
@@ -74,6 +81,6 @@ class DataFrameWrapper:
             (self._index_to_id_map[index], row)
             for index,row in self._df.iterrows()
         ]
-        
+
     def __str__(self):
         return str(self._df)

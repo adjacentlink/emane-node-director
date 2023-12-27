@@ -63,4 +63,27 @@ class PathlossCalculator(object):
 
     @property
     def current(self):
-        return self._current_df.copy()
+        return self
+
+    @property
+    def empty(self):
+        return self._current_df.empty
+
+    def iterrows(self):
+        return self._current_df.iterrows()
+
+    def get_rows(self, idlist):
+        if self._current_df.empty:
+            return DataFrame(columns=['nodeid1', 'nodeid2', 'pathloss', 'meters'])
+        else:
+            return self._current_df.loc[idlist]
+
+    def pathloss_table(self):
+        return self._current_df.pivot_table('pathloss', index='nodeid1', columns='nodeid2')
+
+    def distance_table(self):
+        return self._current_df.pivot_table('meters', index='nodeid1', columns='nodeid2')
+
+    def __str__(self):
+        return str(self._current_df)
+

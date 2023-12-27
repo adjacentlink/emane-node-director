@@ -39,6 +39,17 @@ from emane_node_director.dataframewrapper import DataFrameWrapper
 
 
 class EELParser:
+    def parse_comment_line(self, line, nemid_to_node):
+        """
+        comment line, check for user embedding of nem to node information in form
+        # nem:NEMID node:NODENAME
+        """
+        m = re.search(r'#\s*nem:\s*(?P<nemid>\d+)\s+node:\s*(?P<node>[\w\-]+)\s*', line)
+
+        if m:
+            nemid_to_node[int(m.group('nemid'))] = m.group('node')
+
+
     def parse_pov(self, eelfile):
         states = []
 
@@ -63,13 +74,8 @@ class EELParser:
             if len(line) == 0:
                 continue
 
-            # comment line, check for user embedding of nem to node information in form
-            # nem:NEMID node:NODENAME
             if line[0] == '#':
-                m = re.search(r'#\s*nem:\s*(?P<nemid>\d+)\s+node:\s*(?P<node>[\w\-]+)\s*', line)
-
-                if m:
-                    nemid_to_node[int(m.group('nemid'))] = m.group('node')
+                self.parse_comment_line(line, nemid_to_node)
                 continue
 
             toks = line.split()
@@ -129,6 +135,15 @@ class EELParser:
         state_df.set_index('nodeid', inplace=True)
         states.append((last_eventtime, state_df))
 
+        return self.format_index(states, all_nemids_set, nemid_to_node)
+
+
+    def format_index(self, states, all_nemids_set, nemid_to_node):
+        """
+        Check to see if nem/nodes comment is embedded and if it
+        covers all of the nems in the file then change the DataFrame
+        index to be (nodeid,node).
+        """
         nemid_to_index_map = {id:id for id in all_nemids_set}
 
         if nemid_to_node:
@@ -152,7 +167,6 @@ class EELParser:
         output_states = []
         for tstamp,state_df in states:
             state_df.sort_index(inplace=True)
-
             output_states.append(
                 (tstamp, DataFrameWrapper(state_df, nemid_to_index_map)))
 
@@ -164,6 +178,10 @@ class EELParser:
         rows = {}
 
         last_eventtime = None
+
+        all_nemids_set = set([])
+
+        nemid_to_node = {}
 
         # process eel lines
         lineno = 0
@@ -178,6 +196,7 @@ class EELParser:
 
             # skip comment lines
             if line[0] == '#':
+                self.parse_comment_line(line, nemid_to_node)
                 continue
 
             toks = line.split()
@@ -209,14 +228,26 @@ class EELParser:
                         pass
                     state_df.set_index('nodeid', inplace=True)
                     state_df.sort_index(inplace=True)
-                    states.append(state_df)
+                    states.append((last_eventtime, state_df))
                 last_eventtime = eventtime
 
             nodeid = int(moduleid.split(':')[1])
+            all_nemids_set.add(nodeid)
             ant_num = int(eventargs[0])
             az = float(eventargs[1])
             el = float(eventargs[2])
 
             rows[nodeid] = (nodeid,ant_num,az,el,0)
 
-        return states,rows,last_eventtime
+        state_df = DataFrame(list(rows.values()),
+                             columns=['nodeid','ant_num','az','el','tracking'])
+        try:
+            # this seems necessary for python3
+            state_df = state_df.astype({'ant_num':int,'tracking':int})
+        except:
+            pass
+        state_df.set_index('nodeid', inplace=True)
+        state_df.sort_index(inplace=True)
+        states.append((last_eventtime,state_df))
+
+        return self.format_index(states, all_nemids_set, nemid_to_node)

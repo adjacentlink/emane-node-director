@@ -41,7 +41,7 @@ class AntennaPointer(object):
 
         self._tracker = tracker
 
-        self._states = self._eelfile_to_dataframe_states(eelfile)
+        self._states = EELParser().parse_antenna_pointings(eelfile)
 
         self.reset()
 
@@ -61,40 +61,23 @@ class AntennaPointer(object):
     def update(self):
         current_pos = self._tracker.current
 
-        for tracking_node,row in self._current_df.iterrows():
+        for tracking_node,row in self._current.iterrows():
             if not row.tracking:
                 continue
 
             tracked_node = row.tracking
 
-            remote = current_pos.loc[tracked_node]
+            remote = current_pos.get_row(tracked_node)
 
-            local = current_pos.loc[tracking_node]
+            local = current_pos.get_row(tracking_node)
 
             az, el = calculateDirection(local, remote)
 
-            self._current_df.loc[(tracking_node,'az')] = az
-            self._current_df.loc[(tracking_node,'el')] = el
+            self._current.set_cell(tracking_node,'az',az)
+            self._current.set_cell(tracking_node,'el',el)
 
         for observer in self._observers:
             observer.update()
-
-
-    def _eelfile_to_dataframe_states(self, eelfile):
-        states,rows,last_eventtime = EELParser().parse_antenna_pointings(eelfile)
-
-        state_df = DataFrame(list(rows.values()),
-                             columns=['nodeid','ant_num','az','el','tracking'])
-        try:
-            # this seems necessary for python3
-            state_df = state_df.astype({'ant_num':int,'tracking':int})
-        except:
-            pass
-        state_df.set_index('nodeid', inplace=True)
-        state_df.sort_index(inplace=True)
-        states.append(state_df)
-
-        return states
 
 
     def nodeidstr_to_nodeidlist(self, nodeidstr):
@@ -126,7 +109,7 @@ class AntennaPointer(object):
                 if not i in nodeids:
                     nodeids.append(i)
 
-        known_nodeids = self._state_df.index.unique()
+        known_nodeids = self._state.nodeids()
 
         found_nodeids = [ nodeid for nodeid in nodeids if nodeid in known_nodeids ]
 
@@ -135,25 +118,25 @@ class AntennaPointer(object):
 
     def reset(self, index=0):
         self._stateidx = index
-        self._state_df = self._states[self._stateidx]
+        _,self._state = self._states[self._stateidx]
 
         # reset current ot initial
-        self._current_df = self._state_df.copy()
+        self._current = self._state.copy()
 
 
     def point_elevation(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            self._current_df.loc[(nodeid,'el')] += step
+            self._current.add_cell(nodeid,'el',step)
 
 
     def point_azimuth(self, nodeidlist, step):
         for nodeid in nodeidlist:
-            self._current_df.loc[(nodeid,'az')] += step
+            self._current.add_cell(nodeid,'az',step)
 
 
     def select(self, nodeidlist, ant_num):
         for nodeid in nodeidlist:
-            self._current_df.loc[(nodeid,'ant_num')] = ant_num
+            self._current.set_cell(nodeid,'ant_num',ant_num)
 
 
     def point_at(self, src_nodeidlist, dstnodeid, track):
@@ -162,19 +145,19 @@ class AntennaPointer(object):
                 print('Ignoring same source, destination "%d"' % srcnodeid)
                 continue
 
-            local = self._tracker.current.loc[srcnodeid]
-            remote = self._tracker.current.loc[dstnodeid]
+            local = self._tracker.current.get_row(srcnodeid)
+            remote = self._tracker.current.get_row(dstnodeid)
             az,el = calculateDirection(local, remote)
-            self._current_df.loc[(srcnodeid,'az')] = az
-            self._current_df.loc[(srcnodeid,'el')] = el
+            self._current.set_cell(srcnodeid,'az',az)
+            self._current.set_cell(srcnodeid,'el',el)
 
             if track:
-                self._current_df.loc[(srcnodeid,'tracking')] = dstnodeid
+                self._current.set_cell(srcnodeid,'tracking',dstnodeid)
 
 
     @property
     def current(self):
-        return self._current_df.copy()
+        return self._current.copy()
 
 
     def step(self, steps):

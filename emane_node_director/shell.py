@@ -165,18 +165,17 @@ class Shell(cmd.Cmd):
         current_pathloss = self._pathloss_calc.current
 
         current_time_str = 'time: %.1f' % current_time
-
         print()
         print('-' * len(current_time_str))
         print(current_time_str)
         print('-' * len(current_time_str))
         if arg:
             nodeidstr = arg.split()[0]
-            print(current_pos.loc[self._tracker.nodeidstr_to_nodeidlist(nodeidstr)])
+            print(current_pos.get_rows(self._tracker.nodeidstr_to_nodeidlist(nodeidstr)))
             print()
-            print(current_dir.loc[self._pointer.nodeidstr_to_nodeidlist(nodeidstr)])
+            print(current_dir.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
             print()
-            print(current_pathloss.loc[self._pointer.nodeidstr_to_nodeidlist(nodeidstr)])
+            print(current_pathloss.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
             print()
         else:
             print(current_pos)
@@ -189,7 +188,7 @@ class Shell(cmd.Cmd):
             if current_pathloss.empty:
                 print('No pathloss data')
             else:
-                print(current_pathloss)
+                print(current_pathloss.pathloss_table())
         print()
 
 
@@ -620,7 +619,7 @@ class Shell(cmd.Cmd):
     def do_pointat(self, arg):
         """
         Point the antenna of one or more Nodes (src) at another Node
-        (dst).  Make the selection sticky with the track argument -
+        (dst).  Make the selection sticky by adding literal "track" -
         when the dstNode moves, the srcNodes automatically update
         pointing to follow.
 
@@ -672,7 +671,10 @@ class Shell(cmd.Cmd):
         if not self._statefd:
             self._statefd = open(self._statefile, 'w+')
 
-        EELWriter().write(self._writetime, self._statefd, self._tracker.current, self._pointer.current)
+        EELWriter().write(self._writetime,
+                          self._statefd,
+                          self._tracker.current,
+                          self._pointer.current)
 
         self._writetime += self._timestep
 

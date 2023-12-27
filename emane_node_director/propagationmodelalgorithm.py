@@ -124,5 +124,4 @@ class PropagationModelAlgorithm(object):
 
 
     def compute(self, locations):
-        print(f'xxx {type(locations)}')
         return self._alg.compute(product(locations.iterrows(), locations.iterrows()))

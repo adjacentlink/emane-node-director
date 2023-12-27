@@ -105,7 +105,6 @@ class NodeTracker(object):
     def move_lon(self, nodeidlist, step):
         for nodeid in nodeidlist:
             lon = self.current.get_cell(nodeid, 'lon')
-            print(f'xxx lon={lon}')
             delta = 0.0
             # restrict current lon to range [-180.0, 180.0]
             # TODO, need to deal with wrap around at 180 to -180

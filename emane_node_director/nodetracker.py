@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2020-2022 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2020-2023 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-from emane_node_director.eelparser import EELParser
 import os
 
 
 class NodeTracker(object):
-    def __init__(self, eelfile):
-        self._eelfile = eelfile
-
+    def __init__(self, states):
         self._observers = set([])
 
-        self._states = EELParser().parse_pov(eelfile)
+        self._states = states
 
         self.reset()
 

@@ -33,22 +33,34 @@
 
 from collections import defaultdict
 
-try:
-    from emane.events import PathlossEvent,LocationEvent,AntennaProfileEvent
-except:
-    from emanesh.events import PathlossEvent,LocationEvent,AntennaProfileEvent
-
+from emane.events import EventService,EventServiceException,PathlossEvent,LocationEvent,AntennaProfileEvent
 
 
 class EventServicePublisher:
-    def __init__(self, service):
+    def __init__(self, args):
+        toks = args.eventservicegroup.split(':')
+
+        if not len(toks) == 2:
+            print('eventservicegroup must be in form address:port')
+            exit(1)
+
+        mcgroup,port = toks
+
+        service = None
+
+        try:
+            service = EventService((mcgroup, int(port), args.eventservicedevice))
+
+        except EventServiceException as e:
+            print(e, file=sys.stderr)
+            exit(1)
+
         self._service = service
 
 
     def publish_locations(self, current_state):
         event = LocationEvent()
 
-        print(type(current_state.iterrows()))
         for nodeid,loc in current_state.iterrows():
             event.append(nodeid,
                          latitude=loc.lat,
@@ -81,9 +93,5 @@ class EventServicePublisher:
 
         for nodeid2, event in pathloss_events.items():
             self._service.publish(nodeid2, event)
-
-
-def build_publisher(output_format, service):
-    return EventServicePublisher(service)
 
 

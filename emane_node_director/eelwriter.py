@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # Copyright (c) 2020 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.

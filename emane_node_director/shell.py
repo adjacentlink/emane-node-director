@@ -1,6 +1,5 @@
-#!/usr/bin/env python
 #
-# Copyright (c) 2021-2022 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2021-2023 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,32 +30,29 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-from __future__ import absolute_import, division, print_function
 import cmd
 
 from emane_node_director.antennapointer import AntennaPointer
-from emane_node_director.eelwriter import EELWriter
 from emane_node_director.nodetracker import NodeTracker
 from emane_node_director.pathlosscalculator import PathlossCalculator
-from emane_node_director.publisher import build_publisher
 
 
 class Shell(cmd.Cmd):
     intro = 'EMANE Node Director. Type help or ? to list commands.\n'
     prompt = 'director> '
 
-    def __init__(self, service, args):
+    def __init__(self, node_states, publisher, writer, args):
         cmd.Cmd.__init__(self)
 
-        self._tracker = NodeTracker(args.eelfile)
+        self._writer = writer
 
-        self._publisher = build_publisher('eventchannel', service)
+        self._publisher = publisher
+
+        self._tracker = NodeTracker(node_states)
 
         self._pointer = AntennaPointer(args.eelfile, self._tracker)
 
         self._pathloss_calc = PathlossCalculator(args, self._tracker, self._pointer)
-
-        self._service = service
 
         self._altstep = args.altstep
 
@@ -166,9 +162,9 @@ class Shell(cmd.Cmd):
 
         current_time_str = 'time: %.1f' % current_time
         print()
-        print('-' * len(current_time_str))
         print(current_time_str)
         print('-' * len(current_time_str))
+        print()
         if arg:
             nodeidstr = arg.split()[0]
             print(current_pos.get_rows(self._tracker.nodeidstr_to_nodeidlist(nodeidstr)))
@@ -178,17 +174,20 @@ class Shell(cmd.Cmd):
             print(current_pathloss.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
             print()
         else:
+            print('location')
+            print('--------')
             print(current_pos)
             print()
+            print('pointing')
+            print('--------')
             if current_dir.empty:
                 print('No antenna pointing data')
             else:
                 print(current_dir)
             print()
-            if current_pathloss.empty:
-                print('No pathloss data')
-            else:
-                print(current_pathloss.pathloss_table())
+            print('pathloss')
+            print('--------')
+            print(current_pathloss.pathloss_table())
         print()
 
 
@@ -671,10 +670,10 @@ class Shell(cmd.Cmd):
         if not self._statefd:
             self._statefd = open(self._statefile, 'w+')
 
-        EELWriter().write(self._writetime,
-                          self._statefd,
-                          self._tracker.current,
-                          self._pointer.current)
+        self._writer.write(self._writetime,
+                           self._statefd,
+                           self._tracker.current,
+                           self._pointer.current)
 
         self._writetime += self._timestep
 

@@ -246,6 +246,7 @@ class EELParser:
             state_df = state_df.astype({'ant_num':int,'tracking':int})
         except:
             pass
+
         state_df.set_index('nodeid', inplace=True)
         state_df.sort_index(inplace=True)
         states.append((last_eventtime,state_df))

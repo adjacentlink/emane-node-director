@@ -152,10 +152,17 @@ Direct EMANE node location, orientation and pointing.'''
         print('eventservicegroup must be in form address:port')
         exit(1)
 
-    node_states = EELParser().parse_pov(args.eelfile)
+    eel_parser = EELParser()
+    pov_states = eel_parser.parse_pov(args.eelfile)
+    antenna_pointing_states = eel_parser.parse_antenna_pointings(args.eelfile)
     writer = EELWriter()
     publisher = EventServicePublisher(args)
-    shell = Shell(node_states, publisher, writer, args)
+    shell = Shell(
+        pov_states,
+        antenna_pointing_states,
+        publisher,
+        writer,
+        args)
 
     if args.batch:
         if not os.path.exists(args.batch):

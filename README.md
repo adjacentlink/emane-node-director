@@ -83,14 +83,6 @@ nodeid node
 2      node-002        1  180.0  2.0         0
 3      node-003        2  240.0  1.0         0
 
-pathloss
---------
-nodeid2           1           2           3
-nodeid1
-1               NaN  112.622820  109.745631
-2        112.622820         NaN  114.429019
-3        109.745631  114.429019         NaN
-
 EMANE Node Director. Type help or ? to list commands.
 
 director>

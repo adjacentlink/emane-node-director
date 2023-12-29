@@ -41,16 +41,16 @@ class Shell(cmd.Cmd):
     intro = 'EMANE Node Director. Type help or ? to list commands.\n'
     prompt = 'director> '
 
-    def __init__(self, node_states, publisher, writer, args):
+    def __init__(self, pov_states, antenna_pointing_states, publisher, writer, args):
         cmd.Cmd.__init__(self)
 
         self._writer = writer
 
         self._publisher = publisher
 
-        self._tracker = NodeTracker(node_states)
+        self._tracker = NodeTracker(pov_states)
 
-        self._pointer = AntennaPointer(args.eelfile, self._tracker)
+        self._pointer = AntennaPointer(antenna_pointing_states, self._tracker)
 
         self._pathloss_calc = PathlossCalculator(args, self._tracker, self._pointer)
 
@@ -180,14 +180,13 @@ class Shell(cmd.Cmd):
             print()
             print('pointing')
             print('--------')
-            if current_dir.empty:
-                print('No antenna pointing data')
-            else:
+            if not current_dir.empty:
                 print(current_dir)
-            print()
-            print('pathloss')
-            print('--------')
-            print(current_pathloss.pathloss_table())
+            if not current_pathloss.empty:
+                print()
+                print('pathloss')
+                print('--------')
+                print(current_pathloss.pathloss_table())
         print()
 
 

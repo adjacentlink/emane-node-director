@@ -36,12 +36,10 @@ from emane_node_director.positionorientationvelocity import calculateDirection
 
 
 class AntennaPointer(object):
-    def __init__(self, eelfile, tracker):
-        self._eelfile = eelfile
+    def __init__(self, states, tracker):
+        self._states = states
 
         self._tracker = tracker
-
-        self._states = EELParser().parse_antenna_pointings(eelfile)
 
         self.reset()
 

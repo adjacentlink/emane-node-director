@@ -75,12 +75,25 @@ class DataFrameWrapper:
     def add_row(self, id, addend_row):
         self._df.loc[self._id_to_index_map[id]] += addend_row
 
-    def iterrows(self):
-        # unwrap index to nodeid
-        return [
-            (self._index_to_id_map[index], row)
-            for index,row in self._df.iterrows()
-        ]
+    def iterrows(self, full_index=False):
+        if full_index:
+            return self._df.iterrows()
+        else:
+            return [
+                (self._index_to_id_map[index], row)
+                for index,row in self._df.iterrows()
+            ]
+
+    def id_to_node(self, id):
+        index = self._id_to_index_map.get(id, None)
+
+        if not index:
+            return None
+
+        if id == index:
+            return index
+        else:
+            return index[1]
 
     def __str__(self):
         return str(self._df)

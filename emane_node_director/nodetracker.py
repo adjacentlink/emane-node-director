@@ -313,3 +313,8 @@ class NodeTracker(object):
         self._state_time, self._state = self._states[self._stateidx]
 
         self.update()
+
+
+    def id_to_node(self, id):
+        _,state = self._states[self._stateidx]
+        return state.id_to_node(id)

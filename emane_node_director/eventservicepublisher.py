@@ -88,10 +88,10 @@ class EventServicePublisher:
     def publish_pathlosses(self, current_state):
         pathloss_events = defaultdict(lambda: PathlossEvent())
 
-        for (nodeid1, nodeid2), row in current_state.iterrows():
-            pathloss_events[nodeid2].append(nodeid1, forward=row.pathloss)
+        for (node1id, node2id), row in current_state.iterrows():
+            pathloss_events[node2id].append(node1id, forward=row.pathloss)
 
-        for nodeid2, event in pathloss_events.items():
-            self._service.publish(nodeid2, event)
+        for node2id, event in pathloss_events.items():
+            self._service.publish(node2id, event)
 
 

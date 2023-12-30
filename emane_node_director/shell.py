@@ -169,18 +169,20 @@ class Shell(cmd.Cmd):
             nodeidstr = arg.split()[0]
             print(current_pos.get_rows(self._tracker.nodeidstr_to_nodeidlist(nodeidstr)))
             print()
-            print(current_dir.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
-            print()
-            print(current_pathloss.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
-            print()
+            if not current_dir.empty:
+                print(current_dir.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
+                print()
+            if not current_pathloss.empty:
+                print(current_pathloss.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
+                print()
         else:
             print('location')
             print('--------')
             print(current_pos)
             print()
-            print('pointing')
-            print('--------')
             if not current_dir.empty:
+                print('pointing')
+                print('--------')
                 print(current_dir)
             if not current_pathloss.empty:
                 print()

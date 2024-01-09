@@ -344,7 +344,10 @@ class EELParser:
             for nemstr,pathlossstr in eventargs:
                 nodeid2 = int(nemstr.split(':')[1])
                 pathloss = float(pathlossstr)
-                rows[frozenset((nodeid1,nodeid2))] = (nodeid1,nodeid2,pathloss,float('nan'))
+                # Enter pathloss bidirectionally - not handling asymmetric links
+                # for now.
+                rows[(nodeid1,nodeid2)] = (nodeid1,nodeid2,pathloss,float('nan'))
+                rows[(nodeid2,nodeid1)] = (nodeid1,nodeid2,pathloss,float('nan'))
 
         state_df = DataFrame(list(rows.values()),
                              columns=['node1id', 'node2id', 'pathloss','distance'])

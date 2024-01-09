@@ -86,7 +86,7 @@ class AntennaPointer(object):
         # the current time value
         if not self._states:
             return
-        print(self._states)
+
         upto_states = list(filter(lambda s: s[0]<=state_time, self._states))
 
         if upto_states:

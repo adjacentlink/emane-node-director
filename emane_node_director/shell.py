@@ -168,7 +168,7 @@ class Shell(cmd.Cmd):
         current_pathloss = self._pathloss_calc.current
 
         current_time_str = 'time: %.1f' % current_time
-        print()
+        print('\033c')
         print(current_time_str)
         print('-' * len(current_time_str))
         print()

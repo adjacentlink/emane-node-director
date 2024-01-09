@@ -78,6 +78,24 @@ class AntennaPointer(object):
             observer.update()
 
 
+    def update_step(self, state_time):
+        # when the tracker advances by step on a timeline,
+        # also update to the corresponding antenna pointings
+        # on the timeline, which are the accumulated antenna
+        # pointing states up to and including the ones at
+        # the current time value
+        if not self._states:
+            return
+        print(self._states)
+        upto_states = list(filter(lambda s: s[0]<=state_time, self._states))
+
+        if upto_states:
+            self.reset(len(upto_states)-1)
+
+        for observer in self._observers:
+            observer.update_step(state_time)
+
+
     def nodeidstr_to_nodeidlist(self, nodeidstr):
         nodeids=[]
 
@@ -115,8 +133,10 @@ class AntennaPointer(object):
 
 
     def reset(self, index=0):
+        if not self._states:
+            return
         self._stateidx = index
-        _,self._state = self._states[self._stateidx]
+        self._state_time,self._state = self._states[self._stateidx]
 
         # reset current ot initial
         self._current = self._state.copy()
@@ -156,16 +176,3 @@ class AntennaPointer(object):
     @property
     def current(self):
         return self._current.copy()
-
-
-    def step(self, steps):
-        new_state_index = None
-
-        if steps > 0:
-            max_state_index = len(self._states) - 1
-
-            new_state_index = min(self._stateidx + steps, max_state_index)
-        else:
-            new_state_index = max(self._stateidx + steps, 0)
-
-        self.reset(new_state_index)

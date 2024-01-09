@@ -41,7 +41,14 @@ class Shell(cmd.Cmd):
     intro = 'EMANE Node Director. Type help or ? to list commands.\n'
     prompt = 'director> '
 
-    def __init__(self, pov_states, antenna_pointing_states, publisher, writer, args):
+    def __init__(
+            self,
+            pov_states,
+            antenna_pointing_states,
+            pathloss_states,
+            publisher,
+            writer,
+            args):
         cmd.Cmd.__init__(self)
 
         self._writer = writer
@@ -52,7 +59,7 @@ class Shell(cmd.Cmd):
 
         self._pointer = AntennaPointer(antenna_pointing_states, self._tracker)
 
-        self._pathloss_calc = PathlossCalculator(args, self._tracker, self._pointer)
+        self._pathloss_calc = PathlossCalculator(args, self._tracker, self._pointer, pathloss_states)
 
         self._altstep = args.altstep
 
@@ -201,6 +208,10 @@ class Shell(cmd.Cmd):
         move NodeIds n|s|e|w|u|d [steps]
         """
         toks = arg.split()
+
+        if len(toks) < 3:
+            self.do_help('move')
+            return
 
         nodeidlist = []
 
@@ -700,8 +711,6 @@ class Shell(cmd.Cmd):
                 return
 
         self._tracker.step(steps)
-
-        self._pointer.step(steps)
 
         self._send()
 

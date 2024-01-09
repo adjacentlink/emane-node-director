@@ -32,6 +32,7 @@
 #
 
 from collections import defaultdict
+import sys
 
 from emane.events import EventService,EventServiceException,PathlossEvent,LocationEvent,AntennaProfileEvent
 
@@ -88,6 +89,7 @@ class EventServicePublisher:
     def publish_pathlosses(self, current_state):
         pathloss_events = defaultdict(lambda: PathlossEvent())
 
+        print(current_state)
         for (node1id, node2id), row in current_state.iterrows():
             pathloss_events[node2id].append(node1id, forward=row.pathloss)
 

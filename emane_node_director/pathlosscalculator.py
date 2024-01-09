@@ -36,18 +36,21 @@ from emane_node_director.propagationmodelalgorithm import PropagationModelAlgori
 
 
 class PathlossCalculator(object):
-    def __init__(self, args, tracker, pointer):
+    def __init__(self, args, tracker, pointer, pathloss_states):
         self._tracker = tracker
 
         self._pointer = pointer
-
-        self._algorithm = PropagationModelAlgorithm(args.pathloss, args.frequency)
 
         self._columns = ['node1id', 'node1', 'node2id', 'node2', 'pathloss', 'distance']
 
         self._current_df = DataFrame([], columns=self._columns)
 
-        self._current_df.set_index(['node1id', 'node2id'], inplace=True)
+        self._algorithm = \
+            PropagationModelAlgorithm(self,
+                                      args.pathloss,
+                                      args.frequency,
+                                      pathloss_states)
+
 
         # add this object to the antenna pointer so pathloss
         # events can be generated whenever positions and
@@ -61,10 +64,18 @@ class PathlossCalculator(object):
             rows.append(
                 (id1, self._tracker.id_to_node(id1), id2, self._tracker.id_to_node(id2), pathloss, distance))
 
-        self._current_df = DataFrame(rows, columns=self._columns)
+        if rows:
+            df = DataFrame(rows, columns=self._columns)
+            df.set_index(['node1id','node2id'], inplace=True)
+            self.set_current_df(df)
 
-        self._current_df.set_index(['node1id', 'node2id'], inplace=True)
 
+    def update_step(self, state_time):
+        self._algorithm.update_step(state_time, self._current_df)
+
+    def set_current_df(self, current_df):
+        self._current_df = current_df
+        #self._current_df.set_index(['node1id', 'node2id'], inplace=True)
 
     @property
     def current(self):
@@ -75,6 +86,7 @@ class PathlossCalculator(object):
         return self._current_df.empty
 
     def iterrows(self):
+        print(self._current_df.head())
         return self._current_df.iterrows()
 
     def get_rows(self, idlist):

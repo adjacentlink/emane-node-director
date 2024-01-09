@@ -88,9 +88,9 @@ class NodeTracker(object):
         return found_nodeids
 
 
-    def reset(self, index=0):
+    def reset(self):
         # start back at first state
-        self._stateidx = index
+        self._stateidx = 0
         self._state_time,self._state = self._states[self._stateidx]
 
         # delta positions are 0 to start. just copy the state
@@ -307,12 +307,12 @@ class NodeTracker(object):
         else:
             new_state_index = max(self._stateidx + steps, 0)
 
-        # we don't reset on a step, preserve any translations
-        # that have been done, and preserve tracking
+
         self._stateidx = new_state_index
         self._state_time, self._state = self._states[self._stateidx]
 
-        self.update()
+        for observer in self._observers:
+            observer.update_step(self._state_time)
 
 
     def id_to_node(self, id):

@@ -86,7 +86,6 @@ class PathlossCalculator(object):
         return self._current_df.empty
 
     def iterrows(self):
-        print(self._current_df.head())
         return self._current_df.iterrows()
 
     def get_rows(self, idlist):

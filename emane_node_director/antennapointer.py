@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2020-2022 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2020-2023 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,20 +30,16 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-from __future__ import absolute_import, division, print_function
-import os
-
 from pandas import DataFrame
+from emane_node_director.eelparser import EELParser
 from emane_node_director.positionorientationvelocity import calculateDirection
 
 
 class AntennaPointer(object):
-    def __init__(self, eelfile, tracker):
-        self._eelfile = eelfile
+    def __init__(self, states, tracker):
+        self._states = states
 
         self._tracker = tracker
-
-        self._states = self._eelfile_to_dataframe_states(eelfile)
 
         self.reset()
 
@@ -63,181 +59,103 @@ class AntennaPointer(object):
     def update(self):
         current_pos = self._tracker.current
 
-        for tracking_nem,row in self._current_df.iterrows():
+        for tracking_node,row in self._current.iterrows():
             if not row.tracking:
                 continue
 
-            tracked_nem = row.tracking
+            tracked_node = row.tracking
 
-            remote = current_pos.loc[tracked_nem]
+            remote = current_pos.get_row(tracked_node)
 
-            local = current_pos.loc[tracking_nem]
+            local = current_pos.get_row(tracking_node)
 
             az, el = calculateDirection(local, remote)
 
-            self._current_df.loc[(tracking_nem,'az')] = az
-            self._current_df.loc[(tracking_nem,'el')] = el
+            self._current.set_cell(tracking_node,'az',az)
+            self._current.set_cell(tracking_node,'el',el)
 
         for observer in self._observers:
             observer.update()
 
 
-    def _eelfile_to_dataframe_states(self, eelfile):
-        states = []
-        rows = {}
+    def nodeidstr_to_nodeidlist(self, nodeidstr):
+        nodeids=[]
 
-        # eelfile must be present
-        if not os.path.exists(eelfile):
-            raise RuntimeError('EEL file "%s" does not exist' % eelfile)
+        if not nodeidstr:
+            return nodeids
 
-        last_eventtime = None
+        if len(nodeidstr.strip()) == 0:
+            return nodeids
 
-        # process eel lines
-        lineno = 0
-        for line in open(eelfile, 'r'):
-            lineno += 1
+        nodeidranges = nodeidstr.split(',')
 
-            line = line.strip()
-
-            # skip blank lines
-            if len(line) == 0:
-                continue
-
-            # skip comment lines
-            if line[0] == '#':
-                continue
-
-            toks = line.split()
-
-            # skip non-blank lines with too few tokens
-            if len(toks)>0 and len(toks)<3:
-                raise RuntimeError('Malformed EEL line %s:%d' %
-                                   (eelfile, lineno))
-
-            # -Inf nem:601 antennaprofile 3,251.29,0.031
-            eventtime = float(toks[0])
-            moduleid = toks[1]
-            eventtype = toks[2]
-            eventargs = ','.join(toks[3:])
-            eventargs = eventargs.split(',')
-
-            # ignore other events
-            if not eventtype == 'antennaprofile':
-                continue
-
-            if not eventtime == last_eventtime:
-                if last_eventtime is not None:
-                    state_df = DataFrame(list(rows.values()),
-                                         columns=['nem','ant_num','az','el','tracking'])
-                    try:
-                        # this seems necessary for python3
-                        state_df = state_df.astype({'ant_num':int,'tracking':int})
-                    except:
-                        pass
-                    state_df.set_index('nem', inplace=True)
-                    state_df.sort_index(inplace=True)
-                    states.append(state_df)
-                last_eventtime = eventtime
-
-            nem = int(moduleid.split(':')[1])
-            ant_num = int(eventargs[0])
-            az = float(eventargs[1])
-            el = float(eventargs[2])
-
-            rows[nem] = (nem,ant_num,az,el,0)
-
-        state_df = DataFrame(list(rows.values()),
-                             columns=['nem','ant_num','az','el','tracking'])
-        try:
-            # this seems necessary for python3
-            state_df = state_df.astype({'ant_num':int,'tracking':int})
-        except:
-            pass
-        state_df.set_index('nem', inplace=True)
-        state_df.sort_index(inplace=True)
-        states.append(state_df)
-
-        return states
-
-
-    def nemstr_to_nemlist(self, nemstr):
-        nems=[]
-
-        if not nemstr:
-            return nems
-
-        if len(nemstr.strip()) == 0:
-            return nems
-
-        nemranges = nemstr.split(',')
-
-        for nemrange in nemranges:
-            endpoints = nemrange.split('-')
+        for nodeidrange in nodeidranges:
+            endpoints = nodeidrange.split('-')
 
             startendpoint = int(endpoints[0])
 
             stopendpoint = int(endpoints[-1])
 
-            newnems = []
+            newnodeids = []
 
             if startendpoint > stopendpoint:
-                newnems = [ i for i in range(startendpoint,stopendpoint-1,-1) ]
+                newnodeids = [ i for i in range(startendpoint,stopendpoint-1,-1) ]
             else:
-                newnems = [ i for i in range(startendpoint,stopendpoint+1) ]
+                newnodeids = [ i for i in range(startendpoint,stopendpoint+1) ]
 
-            for i in newnems:
-                if not i in nems:
-                    nems.append(i)
+            for i in newnodeids:
+                if not i in nodeids:
+                    nodeids.append(i)
 
-        known_nems = self._state_df.index.unique()
+        known_nodeids = self._state.nodeids()
 
-        found_nems = [ nem for nem in nems if nem in known_nems ]
+        found_nodeids = [ nodeid for nodeid in nodeids if nodeid in known_nodeids ]
 
-        return found_nems
+        return found_nodeids
 
 
     def reset(self, index=0):
         self._stateidx = index
-        self._state_df = self._states[self._stateidx]
+        _,self._state = self._states[self._stateidx]
 
         # reset current ot initial
-        self._current_df = self._state_df.copy()
+        self._current = self._state.copy()
 
 
-    def point_elevation(self, nemlist, step):
-        for nem in nemlist:
-            self._current_df.loc[(nem,'el')] += step
+    def point_elevation(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._current.add_cell(nodeid,'el',step)
 
 
-    def point_azimuth(self, nemlist, step):
-        for nem in nemlist:
-            self._current_df.loc[(nem,'az')] += step
+    def point_azimuth(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._current.add_cell(nodeid,'az',step)
 
 
-    def select(self, nemlist, ant_num):
-        for nem in nemlist:
-            self._current_df.loc[(nem,'ant_num')] = ant_num
+    def select(self, nodeidlist, ant_num):
+        for nodeid in nodeidlist:
+            self._current.set_cell(nodeid,'ant_num',ant_num)
 
 
-    def point_at(self, src_nemlist, dstnem, track):
-        for srcnem in src_nemlist:
-            if srcnem == dstnem:
-                print('Ignoring same source, destination "%d"' % srcnem)
+    def point_at(self, src_nodeidlist, dstnodeid, track):
+        for srcnodeid in src_nodeidlist:
+            if srcnodeid == dstnodeid:
+                print('Ignoring same source, destination "%d"' % srcnodeid)
                 continue
 
-            local = self._tracker.current.loc[srcnem]
-            remote = self._tracker.current.loc[dstnem]
+            local = self._tracker.current.get_row(srcnodeid)
+            remote = self._tracker.current.get_row(dstnodeid)
             az,el = calculateDirection(local, remote)
-            self._current_df.loc[(srcnem,'az')] = az
-            self._current_df.loc[(srcnem,'el')] = el
+            self._current.set_cell(srcnodeid,'az',az)
+            self._current.set_cell(srcnodeid,'el',el)
 
             if track:
-                self._current_df.loc[(srcnem,'tracking')] = dstnem
+                self._current.set_cell(srcnodeid,'tracking',dstnodeid)
 
 
     @property
     def current(self):
-        return self._current_df.copy()
+        return self._current.copy()
 
 
     def step(self, steps):

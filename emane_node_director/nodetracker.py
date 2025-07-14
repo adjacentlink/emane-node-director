@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2020-2022 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2020-2023 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,19 +31,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-from __future__ import absolute_import, division, print_function
-from collections import defaultdict
 import os
-from pandas import DataFrame
 
 
 class NodeTracker(object):
-    def __init__(self, eelfile):
-        self._eelfile = eelfile
-
+    def __init__(self, states):
         self._observers = set([])
 
-        self._states = self._eelfile_to_dataframe_states(eelfile)
+        self._states = states
 
         self.reset()
 
@@ -57,145 +52,56 @@ class NodeTracker(object):
             observer.update()
 
 
-    def _eelfile_to_dataframe_states(self, eelfile):
-        states = []
+    def nodeidstr_to_nodeidlist(self, nodeidstr):
+        nodeids=[]
 
-        rows = defaultdict(lambda: [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0])
+        if not nodeidstr:
+            return nodeids
 
-        # eelfile must be present
-        if not os.path.exists(eelfile):
-            raise RuntimeError('EEL file "%s" does not exist' % eelfile)
+        if len(nodeidstr.strip()) == 0:
+            return nodeids
 
-        last_eventtime = None
+        nodeidranges = nodeidstr.split(',')
 
-        # process eel lines
-        lineno = 0
-        for line in open(eelfile, 'r'):
-            lineno += 1
-
-            line = line.strip()
-
-            # skip blank lines
-            if len(line) == 0:
-                continue
-
-            # skip comment lines
-            if line[0] == '#':
-                continue
-
-            toks = line.split()
-
-            # skip non-blank lines with too few tokens
-            if len(toks)>0 and len(toks)<3:
-                raise RuntimeError('Malformed EEL line %s:%d' %
-                                   (eelfile, lineno))
-
-            eventtime = float(toks[0])
-            moduleid = toks[1]
-            eventtype = toks[2]
-            eventargs = ','.join(toks[3:])
-            eventargs = eventargs.split(',')
-
-            # ignore other events
-            if not (eventtype == 'location' or eventtype == 'velocity' or eventtype == 'orientation'):
-                continue
-
-            if not eventtime == last_eventtime:
-                if last_eventtime is not None:
-                    state_df = DataFrame(list(rows.values()),
-                                         columns=['nem','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
-                    state_df.set_index('nem', inplace=True)
-                    state_df.sort_index(inplace=True)
-                    states.append((last_eventtime, state_df))
-                last_eventtime = eventtime
-
-            # -Inf   nem:45 location gps 40.025495,-74.315441,3.0
-            # <time> nem:<Id> velocity <azimuth>,<elevation>,<magnitude>
-            # <time> nem:<Id> orientation <pitch>,<roll>,<yaw>
-            event_nem = int(moduleid.split(':')[1])
-
-            if eventtype == 'location':
-                lat, lon, alt = list(map(float, eventargs[1:]))
-                row = rows[event_nem]
-                row[0] = event_nem
-                row[1] = lat
-                row[2] = lon
-                row[3] = alt
-            elif eventtype == 'velocity':
-                az, el, speed = list(map(float, eventargs))
-                row[0] = event_nem
-                row[4] = az
-                row[5] = el
-                row[6] = speed
-            elif eventtype == 'orientation':
-                pitch, roll, yaw = list(map(float, eventargs))
-                row[0] = event_nem
-                row[7] = pitch
-                row[8] = roll
-                row[9] = yaw
-
-        state_df = DataFrame(list(rows.values()),
-                             columns=['nem','lat','lon','alt','az','el','speed','pitch','roll','yaw','tracking'])
-        state_df.set_index('nem', inplace=True)
-        state_df.sort_index(inplace=True)
-        states.append((last_eventtime, state_df))
-
-        return states
-
-
-    def nemstr_to_nemlist(self, nemstr):
-        nems=[]
-
-        if not nemstr:
-            return nems
-
-        if len(nemstr.strip()) == 0:
-            return nems
-
-        nemranges = nemstr.split(',')
-
-        for nemrange in nemranges:
-            endpoints = nemrange.split('-')
+        for nodeidrange in nodeidranges:
+            endpoints = nodeidrange.split('-')
 
             startendpoint = int(endpoints[0])
 
             stopendpoint = int(endpoints[-1])
 
-            newnems = []
+            newnodeids = []
 
             if startendpoint > stopendpoint:
-                newnems = [ i for i in range(startendpoint,stopendpoint-1,-1) ]
+                newnodeids = [ i for i in range(startendpoint,stopendpoint-1,-1) ]
             else:
-                newnems = [ i for i in range(startendpoint,stopendpoint+1) ]
+                newnodeids = [ i for i in range(startendpoint,stopendpoint+1) ]
 
-            for i in newnems:
-                if not i in nems:
-                    nems.append(i)
+            for i in newnodeids:
+                if not i in nodeids:
+                    nodeids.append(i)
 
-        known_nems = self._state_df.index.unique()
+        known_nodeids = self._state.nodeids()
 
-        found_nems = [ nem for nem in nems if nem in known_nems ]
+        found_nodeids = [ nodeid for nodeid in nodeids if nodeid in known_nodeids ]
 
-        return found_nems
+        return found_nodeids
 
 
     def reset(self, index=0):
         # start back at first state
         self._stateidx = index
-        self._state_time, self._state_df = self._states[self._stateidx]
+        self._state_time,self._state = self._states[self._stateidx]
 
-        # delta positions are 0 to start. just copy the state_df
+        # delta positions are 0 to start. just copy the state
         # positions and subtract it off to get all 0s
-        self._delta_df = self._state_df.copy()
-        self._delta_df -= self._state_df
-
+        self._delta_state = self._state.zero()
         self.update()
 
 
-    def move_lon(self, nemlist, step):
-        for nem in nemlist:
-            lon = self.current.loc[nem].lon
-
+    def move_lon(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            lon = self.current.get_cell(nodeid, 'lon')
             delta = 0.0
             # restrict current lon to range [-180.0, 180.0]
             # TODO, need to deal with wrap around at 180 to -180
@@ -206,14 +112,14 @@ class NodeTracker(object):
             else:
                 delta = step
 
-            self._delta_df.loc[(nem,'lon')] += delta
+            self._delta_state.add_cell(nodeid,'lon',delta)
 
-            # now also check if another nem is tracking this one
+            # now also check if another nodeid is tracking this one
             # and move it too
-            for trackingnem,row in self.current.iterrows():
+            for trackingnodeid,row in self.current.iterrows():
                 delta2 = delta
 
-                if row.tracking == nem:
+                if row.tracking == nodeid:
                     lon2 = row.lon
 
                     if lon2 + step > 180.0:
@@ -223,14 +129,14 @@ class NodeTracker(object):
                     else:
                         delta2 = step
 
-                    self._delta_df.loc[(trackingnem,'lon')] += delta2
+                    self._delta_state.add_cell(trackingnodeid,'lon',delta2)
 
         self.update()
 
 
-    def move_lat(self, nemlist, step):
-        for nem in nemlist:
-            lat = self.current.loc[nem].lat
+    def move_lat(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            lat = self.current.get_cell(nodeid, 'lat')
 
             delta = 0.0
 
@@ -242,14 +148,14 @@ class NodeTracker(object):
             else:
                 delta = step
 
-            self._delta_df.loc[(nem,'lat')] += delta
+            self._delta_state.add_cell(nodeid,'lat',delta)
 
-            # now also check if another nem is tracking this one
+            # now also check if another nodeid is tracking this one
             # and move it too
-            for trackingnem,row in self.current.iterrows():
+            for trackingnodeid,row in self.current.iterrows():
                 delta2 = delta
 
-                if row.tracking == nem:
+                if row.tracking == nodeid:
                     lat2 = row.lat
 
                     if lat2 + step > 180.0:
@@ -259,14 +165,14 @@ class NodeTracker(object):
                     else:
                         delta2 = step
 
-                    self._delta_df.loc[(trackingnem,'lat')] += delta2
+                    self._delta_state.add_cell(trackingnodeid,'lat',delta2)
 
         self.update()
 
 
-    def move_alt(self, nemlist, step):
-        for nem in nemlist:
-            alt = self.current.loc[nem].alt
+    def move_alt(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            alt = self.current.get_cell(nodeid, 'alt')
 
             delta = 0.0
 
@@ -276,14 +182,14 @@ class NodeTracker(object):
             else:
                 delta = step
 
-            self._delta_df.loc[(nem,'alt')] += delta
+            self._delta_state.add_cell(nodeid,'alt',delta)
 
-            # now also check if another nem is tracking this one
+            # now also check if another nodeid is tracking this one
             # and move it too
-            for trackingnem,row in self.current.iterrows():
+            for trackingnodeid,row in self.current.iterrows():
                 delta2 = delta
 
-                if row.tracking == nem:
+                if row.tracking == nodeid:
                     alt2 = row.alt
 
                     if alt2 + step < 0.0:
@@ -291,99 +197,99 @@ class NodeTracker(object):
                     else:
                         delta2 = step
 
-                    self._delta_df.loc[(trackingnem,'alt')] += delta2
+                    self._delta_state.add_cell(trackingnodeid,'alt',delta2)
 
         self.update()
 
 
-    def moveto(self, srcnems, dstnem):
-        # for more than one srcnem, the first is the anchor nem.
+    def moveto(self, srcnodeids, dstnodeid):
+        # for more than one srcnodeid, the first is the anchor nodeid.
         # all nodes are "fixed" translated by the same vector
-        # as the anchornem do the dstnem
-        anchornem = srcnems[0]
+        # as the anchornodeid do the dstnodeid
+        anchornodeid = srcnodeids[0]
 
-        delta = self.current.loc[dstnem] - self.current.loc[anchornem]
+        delta = self.current.get_row(dstnodeid) - self.current.get_row(anchornodeid)
 
-        for nem in srcnems:
-            self._delta_df.loc[nem] += delta
+        for nodeid in srcnodeids:
+            self._delta_state.add_row(nodeid, delta)
 
-            for trackingnem,row in self.current.iterrows():
-                if row.tracking == nem:
-                    self._delta_df.loc[trackingnem] += delta
+            for trackingnodeid,row in self.current.iterrows():
+                if row.tracking == nodeid:
+                    self._delta_state.add_row(trackingnodeid, delta)
 
         self.update()
 
 
-    def movewith(self, srcnems, dstnem):
-        # movewith sets srcnems "tracking" column to the
-        # dstnem id. when the dstnem moves, the source nems
+    def movewith(self, srcnodeids, dstnodeid):
+        # movewith sets srcnodeids "tracking" column to the
+        # dstnodeid id. when the dstnodeid moves, the source nodeids
         # move in the same fixed translation. This is
-        # placed in the delta_df so that is is "sticky"
+        # placed in the delta so that is is "sticky"
         # across time steps
-        for srcnem in srcnems:
-            if srcnem == dstnem:
-                print('Ignoring same source, destination "%d"' % srcnem)
+        for srcnodeid in srcnodeids:
+            if srcnodeid == dstnodeid:
+                print('Ignoring same source, destination "%d"' % srcnodeid)
                 continue
 
-            self._delta_df.loc[(srcnem,'tracking')] = dstnem
+            self._delta_state.set_cell(srcnodeid,'tracking',dstnodeid)
 
 
-    def orient_elevation(self, nemlist, step):
-        for nem in nemlist:
-            self._delta_df.loc[(nem,'el')] += step
+    def orient_elevation(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._delta_state.add_cell(nodeid, 'el', step)
 
-            for trackingnem,row in self.current.iterrows():
-                if row.tracking == nem:
-                    self._delta_df.loc[(trackingnem,'el')] += step
-
-        self.update()
-
-
-    def orient_azimuth(self, nemlist, step):
-        for nem in nemlist:
-            self._delta_df.loc[(nem,'az')] += step
-
-            for trackingnem,row in self.current.iterrows():
-                if row.tracking == nem:
-                    self._delta_df.loc[(trackingnem,'az')] += step
+            for trackingnodeid,row in self.current.iterrows():
+                if row.tracking == nodeid:
+                    self._delta_state.add_cell(trackingnodeid, 'el', step)
 
         self.update()
 
 
-    def pitch(self, nemlist, step):
-        for nem in nemlist:
-            self._delta_df.loc[(nem, 'pitch')] += step
+    def orient_azimuth(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._delta_state.add_cell(nodeid,'az', step)
 
-            for trackingnem,row in self.current.iterrows():
-                if row.tracking == nem:
-                    self._delta_df.loc[(trackingnem,'pitch')] += step
-
-        self.update()
-
-    def roll(self, nemlist, step):
-        for nem in nemlist:
-            self._delta_df.loc[(nem, 'roll')] += step
-
-            for trackingnem,row in self.current.iterrows():
-                if row.tracking == nem:
-                    self._delta_df.loc[(trackingnem,'roll')] += step
+            for trackingnodeid,row in self.current.iterrows():
+                if row.tracking == nodeid:
+                    self._delta_state.add_cell(trackingnodeid,'az', step)
 
         self.update()
 
-    def yaw(self, nemlist, step):
-        for nem in nemlist:
-            self._delta_df.loc[(nem, 'yaw')] += step
 
-            for trackingnem,row in self.current.iterrows():
-                if row.tracking == nem:
-                    self._delta_df.loc[(trackingnem,'yaw')] += step
+    def pitch(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._delta_state.add_cell(nodeid, 'pitch', step)
+
+            for trackingnodeid,row in self.current.iterrows():
+                if row.tracking == nodeid:
+                    self._delta_state.add_cell(trackingnodeid, 'pitch', step)
+
+        self.update()
+
+    def roll(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._delta_state.add_cell(nodeid, 'roll', step)
+
+            for trackingnodeid,row in self.current.iterrows():
+                if row.tracking == nodeid:
+                    self._delta_state.add_cell(trackingnodeid,'roll',step)
+
+        self.update()
+
+    def yaw(self, nodeidlist, step):
+        for nodeid in nodeidlist:
+            self._delta_state.add_cell(nodeid, 'yaw', step)
+
+            for trackingnodeid,row in self.current.iterrows():
+                if row.tracking == nodeid:
+                    self._delta_state.add_cell(trackingnodeid, 'yaw', step)
 
         self.update()
 
 
     @property
     def current(self):
-        return self._delta_df + self._state_df
+        return self._delta_state + self._state
 
 
     @property
@@ -404,6 +310,11 @@ class NodeTracker(object):
         # we don't reset on a step, preserve any translations
         # that have been done, and preserve tracking
         self._stateidx = new_state_index
-        self._state_time, self._state_df = self._states[self._stateidx]
+        self._state_time, self._state = self._states[self._stateidx]
 
         self.update()
+
+
+    def id_to_node(self, id):
+        _,state = self._states[self._stateidx]
+        return state.id_to_node(id)

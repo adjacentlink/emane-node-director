@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # Copyright (c) 2020 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
@@ -34,21 +33,21 @@
 
 class EELWriter(object):
     def write(self, time, fd, positions, pointings):
-        for nem,loc in positions.iterrows():
+        for nodeid,loc in positions.iterrows():
             # -Inf   nem:45 location gps 40.025495,-74.315441,3.0
             line = '%0.1f nem:%d location gps %0.6f,%0.6f,%0.1f\n' % \
                 (time,
-                 nem,
+                 nodeid,
                  loc.lat,
                  loc.lon,
                  loc.alt)
             fd.write(line)
 
-        for nem,ant in pointings.iterrows():
+        for nodeid,ant in pointings.iterrows():
             # -Inf nem:601 antennaprofile 3,251.29,0.031
             line = '%0.1f nem:%d antennaprofile %d,%0.3f,%0.3f\n' % \
                 (time,
-                 nem,
+                 nodeid,
                  ant.ant_num,
                  ant.az,
                  ant.el)

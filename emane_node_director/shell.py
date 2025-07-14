@@ -1,6 +1,5 @@
-#!/usr/bin/env python
 #
-# Copyright (c) 2021-2022 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2021-2023 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,35 +30,29 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-from __future__ import absolute_import, division, print_function
 import cmd
-from collections import defaultdict
 
 from emane_node_director.antennapointer import AntennaPointer
-from emane_node_director.eelwriter import EELWriter
 from emane_node_director.nodetracker import NodeTracker
 from emane_node_director.pathlosscalculator import PathlossCalculator
-
-try:
-    from emane.events import PathlossEvent,LocationEvent,AntennaProfileEvent
-except:
-    from emanesh.events import PathlossEvent,LocationEvent,AntennaProfileEvent
 
 
 class Shell(cmd.Cmd):
     intro = 'EMANE Node Director. Type help or ? to list commands.\n'
     prompt = 'director> '
 
-    def __init__(self, service, args):
+    def __init__(self, pov_states, antenna_pointing_states, publisher, writer, args):
         cmd.Cmd.__init__(self)
 
-        self._tracker = NodeTracker(args.eelfile)
+        self._writer = writer
 
-        self._pointer = AntennaPointer(args.eelfile, self._tracker)
+        self._publisher = publisher
+
+        self._tracker = NodeTracker(pov_states)
+
+        self._pointer = AntennaPointer(antenna_pointing_states, self._tracker)
 
         self._pathloss_calc = PathlossCalculator(args, self._tracker, self._pointer)
-
-        self._service = service
 
         self._altstep = args.altstep
 
@@ -123,36 +116,11 @@ class Shell(cmd.Cmd):
 
 
     def _send(self):
-        event = LocationEvent()
+        self._publisher.publish_locations(self._tracker.current)
 
-        for nem, loc in self._tracker.current.iterrows():
-            event.append(nem,
-                         latitude=loc.lat,
-                         longitude=loc.lon,
-                         altitude=loc.alt,
-                         azimuth=loc.az,
-                         elevation=loc.el,
-                         magnitude=loc.speed,
-                         pitch=loc.pitch,
-                         roll=loc.roll,
-                         yaw=loc.yaw)
+        self._publisher.publish_antenna_profiles(self._pointer.current)
 
-        self._service.publish(0, event)
-
-        event = AntennaProfileEvent()
-
-        for nem, pnt in self._pointer.current.iterrows():
-            event.append(nemId=nem, profile=int(pnt.ant_num), azimuth=pnt.az, elevation=pnt.el)
-
-        self._service.publish(0, event)
-
-        pathloss_events = defaultdict(lambda: PathlossEvent())
-
-        for (nem1, nem2), row in self._pathloss_calc.current.iterrows():
-            pathloss_events[nem2].append(nem1, forward=row.pathloss)
-
-        for nem2, event in pathloss_events.items():
-            self._service.publish(nem2, event)
+        self._publisher.publish_pathlosses(self._pathloss_calc.current)
 
         if not self._quiet:
             self.do_show()
@@ -169,11 +137,11 @@ class Shell(cmd.Cmd):
 
     def do_reset(self, arg):
         """
-        Reset all NEMs to their initial state.
+        Reset all Nodes to their initial state.
 
         reset
         """
-        # TODO, handle restting just individual nem args
+        # TODO, handle resetting just individual node args
         self._tracker.reset()
 
         self._pointer.reset()
@@ -183,9 +151,9 @@ class Shell(cmd.Cmd):
 
     def do_show(self, arg=None):
         """
-        Show the current state of one or more NEMs.
+        Show the current state of one or more Nodes.
 
-        show [NEMIds]
+        show [NodeIds]
         """
         current_time = self._tracker.current_time
         current_pos = self._tracker.current
@@ -193,54 +161,57 @@ class Shell(cmd.Cmd):
         current_pathloss = self._pathloss_calc.current
 
         current_time_str = 'time: %.1f' % current_time
-
         print()
-        print('-' * len(current_time_str))
         print(current_time_str)
         print('-' * len(current_time_str))
+        print()
         if arg:
-            nemstr = arg.split()[0]
-            print(current_pos.loc[self._tracker.nemstr_to_nemlist(nemstr)])
+            nodeidstr = arg.split()[0]
+            print(current_pos.get_rows(self._tracker.nodeidstr_to_nodeidlist(nodeidstr)))
             print()
-            print(current_dir.loc[self._pointer.nemstr_to_nemlist(nemstr)])
-            print()
-            print(current_pathloss.loc[self._pointer.nemstr_to_nemlist(nemstr)])
-            print()
+            if not current_dir.empty:
+                print(current_dir.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
+                print()
+            if not current_pathloss.empty:
+                print(current_pathloss.get_rows(self._pointer.nodeidstr_to_nodeidlist(nodeidstr)))
+                print()
         else:
+            print('location')
+            print('--------')
             print(current_pos)
             print()
-            if current_dir.empty:
-                print('No antenna pointing data')
-            else:
+            if not current_dir.empty:
+                print('pointing')
+                print('--------')
                 print(current_dir)
-            print()
-            if current_pathloss.empty:
-                print('No pathloss data')
-            else:
-                print(current_pathloss)
+            if not current_pathloss.empty:
+                print()
+                print('pathloss')
+                print('--------')
+                print(current_pathloss.pathloss_table())
         print()
 
 
 
     def do_move(self, arg):
         """
-        Move one or more NEMs [n]orth, [s]outh, [e]ast, [w]est
+        Move one or more Nodes [n]orth, [s]outh, [e]ast, [w]est
         [u]p or [d]own by 1 or more steps.
 
-        move NEMIds n|s|e|w|u|d [steps]
+        move NodeIds n|s|e|w|u|d [steps]
         """
         toks = arg.split()
 
-        nemlist = []
+        nodeidlist = []
 
         try:
-            nemlist = self._tracker.nemstr_to_nemlist(toks[0])
+            nodeidlist = self._tracker.nodeidstr_to_nodeidlist(toks[0])
         except:
             self.do_help('move')
             return
 
-        if not nemlist:
-            print('No matching nems found for %s.' % toks[0])
+        if not nodeidlist:
+            print('No matching nodes found for %s.' % toks[0])
             return
 
         direction = toks[1].lower()
@@ -251,45 +222,45 @@ class Shell(cmd.Cmd):
 
         steps = 1 if len(toks) < 3 else int(toks[2])
 
-        self._direction_handler[direction](nemlist, steps)
+        self._direction_handler[direction](nodeidlist, steps)
         self._send()
 
 
-    def move_east(self, nemlist, steps):
+    def move_east(self, nodeidlist, steps):
         step = self._latlonstep * steps
-        self._tracker.move_lon(nemlist, step)
+        self._tracker.move_lon(nodeidlist, step)
 
 
-    def move_west(self, nemlist, steps):
+    def move_west(self, nodeidlist, steps):
         step = -self._latlonstep * steps
-        self._tracker.move_lon(nemlist, step)
+        self._tracker.move_lon(nodeidlist, step)
 
 
-    def move_north(self, nemlist, steps):
+    def move_north(self, nodeidlist, steps):
         step = self._latlonstep * steps
-        self._tracker.move_lat(nemlist, step)
+        self._tracker.move_lat(nodeidlist, step)
 
 
-    def move_south(self, nemlist, steps):
+    def move_south(self, nodeidlist, steps):
         step = -self._latlonstep * steps
-        self._tracker.move_lat(nemlist, step)
+        self._tracker.move_lat(nodeidlist, step)
 
 
-    def move_up(self, nemlist, steps):
+    def move_up(self, nodeidlist, steps):
         step = self._altstep * steps
-        self._tracker.move_alt(nemlist, step)
+        self._tracker.move_alt(nodeidlist, step)
 
 
-    def move_down(self, nemlist, steps):
+    def move_down(self, nodeidlist, steps):
         step = -self._altstep * steps
-        self._tracker.move_alt(nemlist, step)
+        self._tracker.move_alt(nodeidlist, step)
 
 
     def do_moveto(self, arg):
         """
-        Move one NEM (src) to the position of another NEM (dst).
+        Move one Node (src) to the position of another Node (dst).
 
-        moveto srcNEMId dstNEMId
+        moveto srcNodeId dstNodeId
         """
         if len(arg) < 2:
             self.do_help('moveto')
@@ -297,39 +268,39 @@ class Shell(cmd.Cmd):
 
         toks = arg.split()
 
-        srcnems = []
-        dstnems = []
+        srcnodes = []
+        dstnodes = []
 
         try:
-            srcnems = self._tracker.nemstr_to_nemlist(toks[0])
-            dstnems = self._tracker.nemstr_to_nemlist(toks[1])
+            srcnodes = self._tracker.nodeidstr_to_nodeidlist(toks[0])
+            dstnodes = self._tracker.nodeidstr_to_nodeidlist(toks[1])
         except:
             self.do_help('moveto')
             return
 
-        if not srcnems:
+        if not srcnodes:
             print('Unknown source "%s"' % toks[0])
             return
 
-        if not dstnems:
+        if not dstnodes:
             print('Unknown destination "%s"' % toks[1])
             return
 
-        if len(dstnems) > 2:
-            print('Too many destination nems')
+        if len(dstnodes) > 2:
+            print('Too many destination nodes')
             return
 
-        dstnem = dstnems.pop()
+        dstnode = dstnodes.pop()
 
-        self._tracker.moveto(srcnems, dstnem)
+        self._tracker.moveto(srcnodes, dstnode)
         self._send()
 
 
     def do_movewith(self, arg):
         """
-        Set one or more NEMs (followers) to move with another NEM (leader).
+        Set one or more Nodes (followers) to move with another Node (leader).
 
-        movewith followerNEMIds leaderNEMId
+        movewith followerNodeIds leaderNodeId
         """
         if len(arg) < 2:
             self.do_help('movewith')
@@ -337,51 +308,51 @@ class Shell(cmd.Cmd):
 
         toks = arg.split()
 
-        srcnems = []
-        dstnems = []
+        srcnodes = []
+        dstnodes = []
 
         try:
-            srcnems = self._tracker.nemstr_to_nemlist(toks[0])
-            dstnems = self._tracker.nemstr_to_nemlist(toks[1])
+            srcnodes = self._tracker.nodeidstr_to_nodeidlist(toks[0])
+            dstnodes = self._tracker.nodeidstr_to_nodeidlist(toks[1])
         except:
             self.do_help('movewith')
             return
 
-        if not srcnems:
+        if not srcnodes:
             print('Unknown source "%s"' % toks[0])
             return
 
-        if not dstnems:
+        if not dstnodes:
             print('Unknown destination "%s"' % toks[1])
             return
 
-        if len(dstnems) > 2:
-            print('Too many destination nems')
+        if len(dstnodes) > 2:
+            print('Too many destination nodes')
             return
 
-        dstnem = dstnems.pop()
+        dstnode = dstnodes.pop()
 
-        self._tracker.movewith(srcnems, dstnem)
+        self._tracker.movewith(srcnodes, dstnode)
 
 
     def do_azimuth(self, arg):
         """
-        Adjust the azimuth component of one or more NEMs velocity
+        Adjust the azimuth component of one or more Nodes velocity
         vector [cw] clockwise or [cc] counterclockwise by one or more
         steps.
 
-        azimuth NEMIds cw|cc [steps]
+        azimuth NodeIds cw|cc [steps]
         """
         toks = arg.split()
 
         try:
-            nemlist = self._tracker.nemstr_to_nemlist(toks[0])
+            nodeidlist = self._tracker.nodeidstr_to_nodeidlist(toks[0])
         except:
             self.do_help('azimuth')
             return
 
-        if not nemlist:
-            print('No matching nems found for %s.' % toks[0])
+        if not nodeidlist:
+            print('No matching nodes found for %s.' % toks[0])
             return
 
         azimuth = toks[1].lower()
@@ -392,27 +363,27 @@ class Shell(cmd.Cmd):
 
         steps = 1 if len(toks) < 3 else int(toks[2])
 
-        self._azimuth_handler[azimuth](nemlist, steps)
+        self._azimuth_handler[azimuth](nodeidlist, steps)
         self._send()
 
 
     def do_elevation(self, arg):
         """
-        Adjust the elevation component of one or more NEMs velocity vector [u]p
+        Adjust the elevation component of one or more Nodes velocity vector [u]p
         or [d]own by one or more steps.
 
-        elevation NEMIds u|d [steps]
+        elevation NodeIds u|d [steps]
         """
         toks = arg.split()
 
         try:
-            nemlist = self._tracker.nemstr_to_nemlist(toks[0])
+            nodeidlist = self._tracker.nodeidstr_to_nodeidlist(toks[0])
         except:
             self.do_help('elevation')
             return
 
-        if not nemlist:
-            print('No matching nems found for %s.' % toks[0])
+        if not nodeidlist:
+            print('No matching nodes found for %s.' % toks[0])
             return
 
         elevation = toks[1].lower()
@@ -423,27 +394,27 @@ class Shell(cmd.Cmd):
 
         steps = 1 if len(toks) < 3 else int(toks[2])
 
-        self._elevation_handler[elevation](nemlist, steps)
+        self._elevation_handler[elevation](nodeidlist, steps)
         self._send()
 
 
     def do_point(self, arg):
         """
-        Adjust antenna pointing of one or more nems [u]p, [d]own, [cw] clockwise
+        Adjust antenna pointing of one or more nodes [u]p, [d]own, [cw] clockwise
         or [cc] counter clockwise by one or more steps.
 
-        point NEMIds u|d|cw|cc [steps]
+        point NodeIds u|d|cw|cc [steps]
         """
         toks = arg.split()
 
         try:
-            nemlist = self._pointer.nemstr_to_nemlist(toks[0])
+            nodeidlist = self._pointer.nodeidstr_to_nodeidlist(toks[0])
         except:
             self.do_help('point')
             return
 
-        if not nemlist:
-            print('No antenna information found for nem %s.' % toks[0])
+        if not nodeidlist:
+            print('No antenna information found for node %s.' % toks[0])
             return
 
         pointing = toks[1].lower()
@@ -454,88 +425,88 @@ class Shell(cmd.Cmd):
 
         steps = 1 if len(toks) < 3 else int(toks[2])
 
-        self._pointing_handler[pointing](nemlist, steps)
+        self._pointing_handler[pointing](nodeidlist, steps)
         self._send()
 
 
-    def elevation_up(self, nemlist, steps):
+    def elevation_up(self, nodeidlist, steps):
         step = self._anglestep * steps
-        self._tracker.orient_elevation(nemlist, step)
+        self._tracker.orient_elevation(nodeidlist, step)
 
-    def elevation_down(self, nemlist, steps):
+    def elevation_down(self, nodeidlist, steps):
         step = -self._anglestep * steps
-        self._tracker.orient_elevation(nemlist, step)
+        self._tracker.orient_elevation(nodeidlist, step)
 
-    def azimuth_clockwise(self, nemlist, steps):
+    def azimuth_clockwise(self, nodeidlist, steps):
         step = self._anglestep * steps
-        self._tracker.orient_azimuth(nemlist, step)
+        self._tracker.orient_azimuth(nodeidlist, step)
 
-    def azimuth_counter_clockwise(self, nemlist, steps):
+    def azimuth_counter_clockwise(self, nodeidlist, steps):
         step = -self._anglestep * steps
-        self._tracker.orient_azimuth(nemlist, step)
+        self._tracker.orient_azimuth(nodeidlist, step)
 
 
-    def pitch_up(self, nemlist, steps):
+    def pitch_up(self, nodeidlist, steps):
         step = self._anglestep * steps
-        self._tracker.pitch(nemlist, step)
+        self._tracker.pitch(nodeidlist, step)
 
-    def pitch_down(self, nemlist, steps):
+    def pitch_down(self, nodeidlist, steps):
         step = -self._anglestep * steps
-        self._tracker.pitch(nemlist, step)
+        self._tracker.pitch(nodeidlist, step)
 
 
-    def roll_clockwise(self, nemlist, steps):
+    def roll_clockwise(self, nodeidlist, steps):
         step = self._anglestep * steps
-        self._tracker.roll(nemlist, step)
+        self._tracker.roll(nodeidlist, step)
 
-    def roll_counter_clockwise(self, nemlist, steps):
+    def roll_counter_clockwise(self, nodeidlist, steps):
         step = -self._anglestep * steps
-        self._tracker.roll(nemlist, step)
+        self._tracker.roll(nodeidlist, step)
 
 
-    def yaw_clockwise(self, nemlist, steps):
+    def yaw_clockwise(self, nodeidlist, steps):
         step = self._anglestep * steps
-        self._tracker.yaw(nemlist, step)
+        self._tracker.yaw(nodeidlist, step)
 
-    def yaw_counter_clockwise(self, nemlist, steps):
+    def yaw_counter_clockwise(self, nodeidlist, steps):
         step = -self._anglestep * steps
-        self._tracker.yaw(nemlist, step)
+        self._tracker.yaw(nodeidlist, step)
 
 
-    def point_up(self, nemlist, steps):
+    def point_up(self, nodeidlist, steps):
         step = self._anglestep * steps
-        self._pointer.point_elevation(nemlist, step)
+        self._pointer.point_elevation(nodeidlist, step)
 
-    def point_down(self, nemlist, steps):
+    def point_down(self, nodeidlist, steps):
         step = -self._anglestep * steps
-        self._pointer.point_elevation(nemlist, step)
+        self._pointer.point_elevation(nodeidlist, step)
 
-    def point_clockwise(self, nemlist, steps):
+    def point_clockwise(self, nodeidlist, steps):
         step = self._anglestep * steps
-        self._pointer.point_azimuth(nemlist, step)
+        self._pointer.point_azimuth(nodeidlist, step)
 
-    def point_counter_clockwise(self, nemlist, steps):
+    def point_counter_clockwise(self, nodeidlist, steps):
         step = -self._anglestep * steps
-        self._pointer.point_azimuth(nemlist, step)
+        self._pointer.point_azimuth(nodeidlist, step)
 
 
     def do_pitch(self, arg):
         """
-        Adjust the pitch of one or more NEMs [u]p or [d]own
+        Adjust the pitch of one or more Nodes [u]p or [d]own
         by one or more steps.
 
-        pitch NEMIds u|d [steps]
+        pitch NodeIds u|d [steps]
         """
         toks = arg.split()
 
         try:
-            nemlist = self._tracker.nemstr_to_nemlist(toks[0])
+            nodeidlist = self._tracker.nodeidstr_to_nodeidlist(toks[0])
         except:
             self.do_help('pitch')
             return
 
-        if not nemlist:
-            print('No matching nems found for %s.' % toks[0])
+        if not nodeidlist:
+            print('No matching nodes found for %s.' % toks[0])
             return
 
         direction = toks[1].lower()
@@ -546,27 +517,27 @@ class Shell(cmd.Cmd):
 
         steps = 1 if len(toks) < 3 else int(toks[2])
 
-        self._pitch_handler[direction](nemlist, steps)
+        self._pitch_handler[direction](nodeidlist, steps)
         self._send()
 
 
     def do_roll(self, arg):
         """
-        Adjust the roll of one or more NEMs [cw] clockwise or [cc]
+        Adjust the roll of one or more Nodes [cw] clockwise or [cc]
         counter-clockwise by one or more steps.
 
-        roll NEMIds cw|cc [steps]
+        roll NodeIds cw|cc [steps]
         """
         toks = arg.split()
 
         try:
-            nemlist = self._tracker.nemstr_to_nemlist(toks[0])
+            nodeidlist = self._tracker.nodeidstr_to_nodeidlist(toks[0])
         except:
             self.do_help('roll')
             return
 
-        if not nemlist:
-            print('No matching nems found for %s.' % toks[0])
+        if not nodeidlist:
+            print('No matching nodes found for %s.' % toks[0])
             return
 
         direction = toks[1].lower()
@@ -577,27 +548,27 @@ class Shell(cmd.Cmd):
 
         steps = 1 if len(toks) < 3 else int(toks[2])
 
-        self._roll_handler[direction](nemlist, steps)
+        self._roll_handler[direction](nodeidlist, steps)
         self._send()
 
 
     def do_yaw(self, arg):
         """
-        Adjust the yaw of one or more NEMs [cw] clockwise or [cc]
+        Adjust the yaw of one or more Nodes [cw] clockwise or [cc]
         counter-clockwise by one or more steps.
 
-        yaw NEMIds cw|cc [steps]
+        yaw NodeIds cw|cc [steps]
         """
         toks = arg.split()
 
         try:
-            nemlist = self._tracker.nemstr_to_nemlist(toks[0])
+            nodeidlist = self._tracker.nodeidstr_to_nodeidlist(toks[0])
         except:
             self.do_help('yaw')
             return
 
-        if not nemlist:
-            print('No matching nems found for %s.' % toks[0])
+        if not nodeidlist:
+            print('No matching nodes found for %s.' % toks[0])
             return
 
         direction = toks[1].lower()
@@ -608,15 +579,15 @@ class Shell(cmd.Cmd):
 
         steps = 1 if len(toks) < 3 else int(toks[2])
 
-        self._yaw_handler[direction](nemlist, steps)
+        self._yaw_handler[direction](nodeidlist, steps)
         self._send()
 
 
     def do_select(self, arg):
         """
-        Select the current antenna index for one or more NEMs.
+        Select the current antenna index for one or more Nodes.
 
-        select NEMIds AntennaId
+        select NodeIds AntennaId
         """
         toks = arg.split()
 
@@ -624,21 +595,21 @@ class Shell(cmd.Cmd):
             self.do_help('select')
             return
 
-        nemlist = []
+        nodeidlist = []
 
         try:
-            nemlist = self._pointer.nemstr_to_nemlist(toks[0])
+            nodeidlist = self._pointer.nodeidstr_to_nodeidlist(toks[0])
         except:
             self.do_help('select')
             return
 
-        if not nemlist:
-            print('No matching nems found for %s.' % toks[0])
+        if not nodeidlist:
+            print('No matching nodes found for %s.' % toks[0])
             return
 
         try:
             ant_num = int(toks[1])
-            self._pointer.select(nemlist, ant_num)
+            self._pointer.select(nodeidlist, ant_num)
             self._send()
         except Exception as e:
             print(e)
@@ -647,12 +618,12 @@ class Shell(cmd.Cmd):
 
     def do_pointat(self, arg):
         """
-        Point the antenna of one or more NEMs (src) at another NEM
-        (dst).  Make the selection sticky with the track argument -
-        when the dstNEM moves, the srcNEMs automatically update
+        Point the antenna of one or more Nodes (src) at another Node
+        (dst).  Make the selection sticky by adding literal "track" -
+        when the dstNode moves, the srcNodes automatically update
         pointing to follow.
 
-        pointat srcNEMIds dstNEMId [track]
+        pointat srcNodeIds dstNodeId [track]
         """
         toks = arg.split()
 
@@ -660,39 +631,39 @@ class Shell(cmd.Cmd):
             self.do_help('pointat')
             return
 
-        srcnems = []
-        dstnems = []
+        srcnodes = []
+        dstnodes = []
 
         try:
-            srcnems = self._pointer.nemstr_to_nemlist(toks[0])
-            dstnems = self._tracker.nemstr_to_nemlist(toks[1])
+            srcnodes = self._pointer.nodeidstr_to_nodeidlist(toks[0])
+            dstnodes = self._tracker.nodeidstr_to_nodeidlist(toks[1])
         except:
             self.do_help('pointat')
             return
 
-        if not srcnems:
-            print('No valid srcNEMIds in "%s"' % toks[0])
+        if not srcnodes:
+            print('No valid srcNodeIds in "%s"' % toks[0])
             return
 
-        if not len(dstnems) == 1:
-            print('invalid dstNEMId argument "%s"' % toks[1])
+        if not len(dstnodes) == 1:
+            print('invalid dstNodeId argument "%s"' % toks[1])
             return
 
-        dstnem = dstnems.pop()
+        dstnode = dstnodes.pop()
 
         track = False
 
         if len(toks) > 2:
             track = toks[2].lower() == 'track'
 
-        self._pointer.point_at(srcnems, dstnem, track)
+        self._pointer.point_at(srcnodes, dstnode, track)
 
         self._send()
 
 
     def do_write(self, arg):
         """
-        Write the current NEMs state to the State File at the
+        Write the current Nodes state to the State File at the
         next timestep.
 
         write
@@ -700,7 +671,10 @@ class Shell(cmd.Cmd):
         if not self._statefd:
             self._statefd = open(self._statefile, 'w+')
 
-        EELWriter().write(self._writetime, self._statefd, self._tracker.current, self._pointer.current)
+        self._writer.write(self._writetime,
+                           self._statefd,
+                           self._tracker.current,
+                           self._pointer.current)
 
         self._writetime += self._timestep
 

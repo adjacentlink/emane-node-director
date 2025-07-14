@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2020,2023 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-from __future__ import absolute_import, division, print_function
 import datetime
 import math
 import time

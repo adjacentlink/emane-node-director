@@ -15,6 +15,15 @@ NEMs (1-3) plus POV settings at two timepoints T=0.0 and 1.0.
 ```
 # example.eel
 # -----------
+#
+# optional nem to node mapping embedded in comments.
+# emane-node-director will list the node names along with
+# the nem id in its tables if it finds this list and
+# if a mapping entry exists for all nems in the file
+#
+# nem:1  node:node-001
+# nem:2  node:node-002
+# nem:3  node:node-003
 
 0.0 nem:1 antennaprofile 1,60.0,3.0
 0.0 nem:2 antennaprofile 1,180.0,2.0
@@ -55,19 +64,24 @@ each command issued.
 ```
 me@host$ emane-node-director --eventservicedevice eno1 example.eel
 
-           lat        lon    alt     az   el  speed  pitch  roll  yaw  tracking
-nem
-1    24.645396 -82.820650  300.0  180.0  0.0    5.0    3.0   4.0  0.0         0
-2    24.606149 -82.820650  300.0    0.0  0.0    5.0    4.0   3.0  0.0         0
-3    24.645396 -82.851483  300.0  180.0  0.0    5.0    3.0   4.0  0.0         0
+time: 0.0
+---------
 
-     ant_num     az   el  tracking
-nem
-1          1   60.0  3.0         0
-2          1  180.0  2.0         0
-3          2  240.0  1.0         0
+location
+--------
+                       lat        lon    alt     az   el  speed  pitch  roll  yaw  tracking
+nodeid node
+1      node-001  24.645396 -82.820650  300.0  180.0  0.0    5.0    3.0   4.0  0.0         0
+2      node-002  24.606149 -82.820650  300.0    0.0  0.0    5.0    4.0   3.0  0.0         0
+3      node-003  24.645396 -82.851483  300.0  180.0  0.0    5.0    3.0   4.0  0.0         0
 
-No pathloss data
+pointing
+--------
+                 ant_num     az   el  tracking
+nodeid node
+1      node-001        1   60.0  3.0         0
+2      node-002        1  180.0  2.0         0
+3      node-003        2  240.0  1.0         0
 
 EMANE Node Director. Type help or ? to list commands.
 

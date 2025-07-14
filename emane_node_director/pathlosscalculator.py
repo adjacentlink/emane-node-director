@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021-2022 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2021-2023 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -43,9 +43,11 @@ class PathlossCalculator(object):
 
         self._algorithm = PropagationModelAlgorithm(args.pathloss, args.frequency)
 
-        self._current_df = DataFrame([], columns=['nem1', 'nem2', 'pathloss', 'meters'])
+        self._columns = ['node1id', 'node1', 'node2id', 'node2', 'pathloss', 'distance']
 
-        self._current_df.set_index(['nem1', 'nem2'], inplace=True)
+        self._current_df = DataFrame([], columns=self._columns)
+
+        self._current_df.set_index(['node1id', 'node2id'], inplace=True)
 
         # add this object to the antenna pointer so pathloss
         # events can be generated whenever positions and
@@ -54,13 +56,39 @@ class PathlossCalculator(object):
 
 
     def update(self):
-        rows = self._algorithm.compute(self._tracker.current)
+        rows = []
+        for id1,id2,pathloss,distance in  self._algorithm.compute(self._tracker.current):
+            rows.append(
+                (id1, self._tracker.id_to_node(id1), id2, self._tracker.id_to_node(id2), pathloss, distance))
 
-        self._current_df = DataFrame(rows, columns=['nem1', 'nem2', 'pathloss', 'meters'])
+        self._current_df = DataFrame(rows, columns=self._columns)
 
-        self._current_df.set_index(['nem1', 'nem2'], inplace=True)
+        self._current_df.set_index(['node1id', 'node2id'], inplace=True)
 
 
     @property
     def current(self):
-        return self._current_df.copy()
+        return self
+
+    @property
+    def empty(self):
+        return self._current_df.empty
+
+    def iterrows(self):
+        return self._current_df.iterrows()
+
+    def get_rows(self, idlist):
+        if self._current_df.empty:
+            return DataFrame(columns=self._columns)
+        else:
+            return self._current_df.loc[idlist]
+
+    def pathloss_table(self):
+        return self._current_df.pivot_table('pathloss', index='node1id', columns='node2id')
+
+    def distance_table(self):
+        return self._current_df.pivot_table('meters', index='node1id', columns='node2id')
+
+    def __str__(self):
+        return str(self._current_df)
+

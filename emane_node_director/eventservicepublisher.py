@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2023 - Adjacent Link LLC, Bridgewater, New Jersey
+# Copyright (c) 2023,2026 - Adjacent Link LLC, Bridgewater, New Jersey
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
+import sys
 from collections import defaultdict
 
 from emane.events import EventService,EventServiceException,PathlossEvent,LocationEvent,AntennaProfileEvent
